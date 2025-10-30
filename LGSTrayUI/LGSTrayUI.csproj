@@ -12,7 +12,7 @@
     <UseWPF>true</UseWPF>
     <PublishSingleFile>true</PublishSingleFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <VersionPrefix>4.0.1</VersionPrefix>
+    <VersionPrefix>4.0.0</VersionPrefix>
     <AssemblyName>DeviceBatteryTray</AssemblyName>
     <ApplicationIcon>Resources\logo_black.ico</ApplicationIcon>
   </PropertyGroup>

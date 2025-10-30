@@ -1,3 +1,23 @@
+# Build outputs
+bin/
+obj/
+
+# VS Code/JetBrains/OS files
+.vscode/
+.idea/
+*.DS_Store
+
+# Publish artifacts
+LGSTrayUI/bin/Release/net8.0-windows/win-x64/publish/
+DeviceBatteryTray-win-x64.zip
+
+# Logs
+*.log
+crashlog_*.log
+
+# User settings
+LGSTrayUI/Properties/Settings.user
+
 HIDPP_Bat_Mon/**
 
 # Native HID CPP daemon libs

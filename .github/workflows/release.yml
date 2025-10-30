@@ -1,5 +1,8 @@
 name: release
 
+permissions:
+    contents: write
+
 on:
     push:
         tags:
@@ -35,5 +38,6 @@ jobs:
               uses: softprops/action-gh-release@v2
               with:
                   files: ${{ env.ZIP_PATH }}
+                  generate_release_notes: true
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
