@@ -17,6 +17,7 @@ namespace LGSTrayHID.HyperX
 
                 while (!ct.IsCancellationRequested)
                 {
+                    double batteryPercent = -1;
                     try
                     {
                         int batteryByteIdx = 7;
@@ -24,7 +25,6 @@ namespace LGSTrayHID.HyperX
                         const int DATA_BUFFER_SIZE = 20;
 
                         byte[] writeBuffer = new byte[WRITE_BUFFER_SIZE];
-                        double batteryPercent = -1;
 
                         bool isHP = manufacturer?.IndexOf("HP", StringComparison.OrdinalIgnoreCase) >= 0;
 
@@ -98,7 +98,6 @@ namespace LGSTrayHID.HyperX
                         batteryPercent = (batteryRaw >= 0 && batteryRaw <= 100) ? batteryRaw : -1;
                         consecutiveFails = 0;
 
-Publish:
 Publish:
                         publisher?.Invoke(
                             IPCMessageType.UPDATE,
