@@ -42,10 +42,9 @@ public partial class App : Application
         builder.Services.AddSingleton<LogiDeviceIconFactory>();
         builder.Services.AddSingleton<LogiDeviceViewModelFactory>();
 
-        builder.Services.AddWebserver(builder.Configuration);
+        // HTTP webserver disabled for minimal HID-only build
 
         builder.Services.AddIDeviceManager<LGSTrayHIDManager>(builder.Configuration);
-        builder.Services.AddIDeviceManager<GHubManager>(builder.Configuration);
         builder.Services.AddSingleton<ILogiDeviceCollection, LogiDeviceCollection>();
 
         builder.Services.AddSingleton<MainTaskbarIconWrapper>();

@@ -12,13 +12,20 @@
     <UseWPF>true</UseWPF>
     <PublishSingleFile>true</PublishSingleFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <VersionPrefix>3.0.3</VersionPrefix>
+    <VersionPrefix>4.0.0</VersionPrefix>
     <AssemblyName>LGSTray</AssemblyName>
     <ApplicationIcon>Resources\logo_black.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <Content Include="Resources\logo_black.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\LGSTrayHID\libhidapi\*.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>%(Filename)%(Extension)</Link>
+    </Content>
   </ItemGroup>
 
   <ItemGroup Condition=" '$(PublishProtocol)' == '' ">
@@ -42,7 +49,6 @@
     <PackageReference Include="System.Diagnostics.EventLog" Version="8.0.0" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="Tommy.Extensions.Configuration" Version="6.2.0" />
-    <PackageReference Include="Websocket.Client" Version="5.0.0" />
   </ItemGroup>
 
   <ItemGroup>

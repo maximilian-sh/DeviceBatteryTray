@@ -2,13 +2,13 @@
 enableRichToolTips = true
 
 [HTTPServer]
-enabled = true
+enabled = false
 addr = "localhost"
 port = 12321
 useIpv6 = true
 
 [GHub]
-enabled = true
+enabled = false
 
 [Native]
 enabled = true
