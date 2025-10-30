@@ -63,7 +63,7 @@ namespace LGSTrayHID.HyperX
                             // Kingston Cloud II Wireless requires input report(6) read before write
                             byte[] inputBuf = new byte[160];
                             inputBuf[0] = 0x06;
-                            _ = HidApi.HidGetInputReport(dev, inputBuf, (nuint)inputBuf.Length);
+                            _ = LGSTrayHID.HidApi.HidApi.HidGetInputReport(dev, inputBuf, (nuint)inputBuf.Length);
 
                             writeBuffer[0] = 0x06;
                             writeBuffer[2] = 0x02;
