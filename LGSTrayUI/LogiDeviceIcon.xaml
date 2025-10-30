@@ -10,7 +10,6 @@
              mc:Ignorable="d" 
              >
     <tb:TaskbarIcon x:Name="taskbarIcon"
-                    ToolTipText="{Binding Path=ToolTipString}"
                     ContextMenu="{StaticResource SysTrayMenu}">
         <tb:TaskbarIcon.TrayToolTip>
             <Grid>
@@ -20,7 +19,8 @@
                     Background="{Binding Path=(local:CheckTheme.LightTheme), Converter={StaticResource ThemeBrushConverter}, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
                     >
                     <StackPanel Margin="5">
-                        <TextBlock Text="{Binding Path=ToolTipString}" 
+                        <TextBlock Text="{Binding Path=ToolTipString}"
+                                   TextAlignment="Center"
                                    Foreground="{Binding Path=(local:CheckTheme.LightTheme), Converter={StaticResource ThemeBrushConverter}, ConverterParameter=Text}" 
                         />
                     </StackPanel>
