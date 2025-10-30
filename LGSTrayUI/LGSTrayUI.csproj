@@ -17,7 +17,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <VersionPrefix>4.0.1</VersionPrefix>
+    <VersionPrefix>4.0.2</VersionPrefix>
     <AssemblyName>DeviceBatteryTray</AssemblyName>
     <ApplicationIcon>Resources\logo_black.ico</ApplicationIcon>
   </PropertyGroup>
@@ -29,12 +29,17 @@
   <!-- Ensure HID helper EXE is published alongside the tray app -->
   <Target Name="CopyLGSTrayHIDOnPublish" AfterTargets="Publish">
     <Exec Command="dotnet publish &quot;..\LGSTrayHID\LGSTrayHID.csproj&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -p:EnableCompressionInSingleFile=true -o $(PublishDir)" />
+    <!-- Explicitly copy hidapi.dll to publish directory after HID publish -->
+    <Copy SourceFiles="..\LGSTrayHID\libhidapi\hidapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+    <!-- Ensure appsettings.toml is in publish directory -->
+    <Copy SourceFiles="appsettings.toml" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('appsettings.toml')" />
   </Target>
 
   <ItemGroup>
     <Content Include="..\LGSTrayHID\libhidapi\*.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <Link>%(Filename)%(Extension)</Link>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 
@@ -88,6 +93,7 @@
   <ItemGroup>
     <None Update="appsettings.toml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
     </None>
     <None Update="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>

@@ -13,6 +13,14 @@ try {
 	$uiWinX64Dir = Join-Path $solutionRoot ("LGSTrayUI\bin\{0}\net8.0-windows\win-x64" -f $Configuration)
 	$publishDir = Join-Path $uiWinX64Dir "standalone"
 
+	# Stop running instances to avoid file locks during publish
+	$procNames = @('DeviceBatteryTray', 'LGSTrayHID')
+	foreach ($name in $procNames) {
+		Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
+			try { $_ | Stop-Process -Force -ErrorAction SilentlyContinue } catch {}
+		}
+	}
+
 	# Clean previous artifacts and intermediate outputs when requested
 	if ($Clean) {
 		$pathsToClean = @()
@@ -29,7 +37,19 @@ try {
 		}
 	}
 
-	dotnet publish .\LGSTrayUI\LGSTrayUI.csproj -c $Configuration -p:PublishProfile=Standalone --nologo
+	# Publish with a simple retry to mitigate transient file locks
+	$attempt = 0
+	$maxAttempts = 2
+	while ($attempt -lt $maxAttempts) {
+		$attempt++
+		try {
+			dotnet publish .\LGSTrayUI\LGSTrayUI.csproj -c $Configuration -p:PublishProfile=Standalone --nologo
+			break
+		} catch {
+			if ($attempt -ge $maxAttempts) { throw }
+			Start-Sleep -Seconds 2
+		}
+	}
 
 	# After publish, remove noisy per-project win-x64 output except the 'standalone' folder
 	if (Test-Path $uiWinX64Dir) {

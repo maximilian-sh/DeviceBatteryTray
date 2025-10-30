@@ -2,9 +2,15 @@
 
 Minimal Windows tray app that shows battery for supported USB HID devices using native HID only. No Logitech G Hub or other vendor apps required.
 
-## How to install
+## Install
 
-Please visit the latest release page and download the release zip. Standalone builds include .NET 8; non-standalone builds require .NET 8 installed.
+1) Download the latest `DeviceBatteryTray-vX.Y.Z-win-x64.zip` from Releases.
+2) Extract the ZIP anywhere you like (no installer required).
+3) Run `DeviceBatteryTray.exe`.
+
+Notes:
+- The folder must contain these files next to the EXE: `LGSTrayHID.exe`, `hidapi.dll`, `appsettings.toml`.
+- The shipped build is self-contained (.NET 8 not required).
 
 ## Devices
 
@@ -59,19 +65,21 @@ disabledDevices = [
 
 ## Build
 
--   Install .NET 8 SDK
--   Windows only (WPF)
--   Debug build
+- Install .NET 8 SDK (Windows)
+- Debug build
 
 ```
 dotnet build -c Debug LGSTrayUI/LGSTrayUI.csproj
 ```
 
--   Release, standalone
+- Release (uses the script and publish profile)
 
 ```
-dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true --self-contained true LGSTrayUI/LGSTrayUI.csproj
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\release.ps1 -Clean -Configuration Release
 ```
+
+Artifacts:
+- Output: `LGSTrayUI\bin\Release\net8.0-windows\win-x64\standalone` (contains the EXE, `LGSTrayHID.exe`, `hidapi.dll`, `appsettings.toml`).
 
 ## Acknowledgements
 

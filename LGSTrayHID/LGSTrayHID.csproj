@@ -35,8 +35,15 @@
     <ContentWithTargetPath Include="libhidapi/*.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>%(Filename)%(Extension)</TargetPath>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </ContentWithTargetPath>
     <None Include="libhidapi/*.dll" />
   </ItemGroup>
+
+  <!-- Ensure hidapi.dll is copied to publish directory as external file -->
+  <Target Name="CopyNativeLibsOnPublish" AfterTargets="Publish">
+    <Copy SourceFiles="libhidapi\hidapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>
