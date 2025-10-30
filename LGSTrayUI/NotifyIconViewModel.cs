@@ -47,7 +47,7 @@ namespace LGSTrayUI
         }
 
         private const string AutoStartRegKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-        private const string AutoStartRegKeyValue = "LGSTrayGUI";
+        private const string AutoStartRegKeyValue = "DeviceBatteryTray";
         private bool? _autoStart = null;
         public bool AutoStart
         {
