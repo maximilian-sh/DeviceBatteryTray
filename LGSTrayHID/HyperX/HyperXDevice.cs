@@ -10,7 +10,7 @@ namespace LGSTrayHID.HyperX
         {
             return Task.Run(async () =>
             {
-                // Initial fast update then back off to default poll period
+                // Initial fast update then adjust per state (on/off)
                 TimeSpan delay = TimeSpan.FromSeconds(2);
 
                 int consecutiveFails = 0;
@@ -99,6 +99,7 @@ namespace LGSTrayHID.HyperX
                         consecutiveFails = 0;
 
 Publish:
+Publish:
                         publisher?.Invoke(
                             IPCMessageType.UPDATE,
                             new UpdateMessage(
@@ -112,8 +113,13 @@ Publish:
                     }
                     catch { }
 
+                    // Poll faster when device is off/unavailable, slower when on
+                    int nextSeconds = (batteryPercent < 0)
+                        ? GlobalSettings.settings.RetryTime
+                        : GlobalSettings.settings.PollPeriod;
+
                     await Task.Delay(delay, CancellationToken.None);
-                    delay = TimeSpan.FromSeconds(GlobalSettings.settings.PollPeriod);
+                    delay = TimeSpan.FromSeconds(nextSeconds);
                 }
             });
         }
