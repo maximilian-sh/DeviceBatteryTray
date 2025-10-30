@@ -6,11 +6,16 @@ Minimal Windows tray app that shows battery for supported USB HID devices using 
 
 1) Download the latest `DeviceBatteryTray-vX.Y.Z-win-x64.zip` from Releases.
 2) Extract the ZIP anywhere you like (no installer required).
-3) Run `DeviceBatteryTray.exe`.
+3) **First-time setup (Windows SmartScreen):**
+   - Windows may block the app because it was downloaded from the internet. You'll need to allow both executables:
+   - Right-click `DeviceBatteryTray.exe` → Properties → Unblock (if shown), then run it and allow it when prompted.
+   - **Important:** Also right-click `LGSTrayHID.exe` → Properties → Unblock (if shown), then run it once manually to allow it. This is required because the main app launches this helper process.
+4) Run `DeviceBatteryTray.exe` normally after allowing both executables.
 
 Notes:
 - The folder must contain these files next to the EXE: `LGSTrayHID.exe`, `hidapi.dll`, `appsettings.toml`.
 - The shipped build is self-contained (.NET 8 not required).
+- After the first run, Windows will remember both executables and you won't need to unblock them again.
 
 ## Devices
 
