@@ -1,0 +1,89 @@
+name: Release on version bump
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # required to read tags
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Determine version and if release needed
+        id: version_check
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $csprojPath = "LGSTrayUI/LGSTrayUI.csproj"
+          if (-not (Test-Path $csprojPath)) { throw "Missing $csprojPath" }
+          [xml]$xml = Get-Content $csprojPath
+          $versionPrefix = ($xml.Project.PropertyGroup | ForEach-Object { $_.VersionPrefix } | Where-Object { $_ } | Select-Object -First 1)
+          if (-not $versionPrefix) { throw "VersionPrefix not found in $csprojPath" }
+
+          # Get latest tag matching v*
+          $latestTag = (& git tag --list "v*" | Sort-Object { [version]($_ -replace '^v','') } -Descending | Select-Object -First 1)
+          if (-not $latestTag) { $latestTag = 'v0.0.0' }
+
+          $currentVersion = [version]$versionPrefix
+          $latestVersion = [version]($latestTag.TrimStart('v'))
+
+          $releaseNeeded = ($currentVersion -gt $latestVersion)
+          "current=$currentVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "latest=$latestVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "release=$releaseNeeded" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Current: $currentVersion | Latest: $latestVersion | Release: $releaseNeeded"
+
+      - name: Build release (only if version bumped)
+        if: steps.version_check.outputs.release == 'True'
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\release.ps1 -Clean -Configuration Release
+
+      - name: Zip artifact (only if version bumped)
+        if: steps.version_check.outputs.release == 'True'
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version_check.outputs.current }}'
+          $outDir = "LGSTrayUI\bin\Release\net8.0-windows\win-x64\standalone"
+          if (-not (Test-Path $outDir)) { throw "Publish output missing: $outDir" }
+          $zipName = "DeviceBatteryTray-v$version-win-x64.zip"
+          $zipPath = Join-Path (Get-Location) $zipName
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Compress-Archive -Path (Join-Path $outDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
+          "zip_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        id: zip
+
+      - name: Create GitHub Release
+        if: steps.version_check.outputs.release == 'True'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version_check.outputs.current }}
+          name: DeviceBatteryTray v${{ steps.version_check.outputs.current }}
+          draft: false
+          prerelease: false
+          files: |
+            ${{ steps.zip.outputs.zip_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Skip note
+        if: steps.version_check.outputs.release != 'True'
+        shell: pwsh
+        run: |
+          Write-Host "No release: Version unchanged or lower (current=${{ steps.version_check.outputs.current }}, latest=${{ steps.version_check.outputs.latest }})"
+
+
