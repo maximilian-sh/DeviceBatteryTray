@@ -89,6 +89,35 @@ namespace LGSTrayHID
             {
                 string manufacturer = deviceInfo.GetManufacturerString();
                 string product = deviceInfo.GetProductString();
+
+                // Choose the best HyperX interface (highest usage/usage_page), similar to HyperX project
+                unsafe
+                {
+                    var head = HidEnumerate(deviceInfo.VendorId, deviceInfo.ProductId);
+                    HidDeviceInfo* best = null;
+                    int bestUsage = -1;
+                    int bestUsagePage = -1;
+                    for (var cur = head; cur != null; cur = cur->Next)
+                    {
+                        if (cur->Usage > bestUsage || (cur->Usage == bestUsage && cur->UsagePage >= bestUsagePage))
+                        {
+                            best = cur;
+                            bestUsage = cur->Usage;
+                            bestUsagePage = cur->UsagePage;
+                        }
+                    }
+
+                    if (best != null)
+                    {
+                        // Open the best interface path for battery query
+                        dev = HidOpenPath(ref *best);
+                    }
+
+                    if (head != null)
+                    {
+                        HidFreeEnumeration(head);
+                    }
+                }
                 // Publish minimal init now; polling handled by HyperX handler
                 HidppDeviceEvent?.Invoke(
                     LGSTrayPrimitives.MessageStructs.IPCMessageType.INIT,

@@ -80,11 +80,16 @@ namespace LGSTrayHID.HyperX
                         _ = await dev.WriteAsync(writeBuffer);
 
                         byte[] dataBuffer = new byte[DATA_BUFFER_SIZE];
-                        _ = dev.Read(dataBuffer, DATA_BUFFER_SIZE, 1000);
+                        int ret = dev.Read(dataBuffer, DATA_BUFFER_SIZE, 1000);
+                        if (ret <= 0)
+                        {
+                            goto Publish;
+                        }
 
-                        int batteryRaw = (batteryByteIdx >= 0 && batteryByteIdx < dataBuffer.Length) ? dataBuffer[batteryByteIdx] : -1;
-                        double batteryPercent = batteryRaw >= 0 ? batteryRaw : -1;
+                        int batteryRaw = (batteryByteIdx >= 0 && batteryByteIdx < ret) ? dataBuffer[batteryByteIdx] : -1;
+                        double batteryPercent = (batteryRaw >= 0 && batteryRaw <= 100) ? batteryRaw : -1;
 
+Publish:
                         publisher?.Invoke(
                             IPCMessageType.UPDATE,
                             new UpdateMessage(
