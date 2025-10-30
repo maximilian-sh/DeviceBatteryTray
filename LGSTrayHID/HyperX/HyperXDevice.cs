@@ -13,6 +13,8 @@ namespace LGSTrayHID.HyperX
                 // Initial fast update then back off to default poll period
                 TimeSpan delay = TimeSpan.FromSeconds(2);
 
+                int consecutiveFails = 0;
+
                 while (!ct.IsCancellationRequested)
                 {
                     try
@@ -22,6 +24,7 @@ namespace LGSTrayHID.HyperX
                         const int DATA_BUFFER_SIZE = 20;
 
                         byte[] writeBuffer = new byte[WRITE_BUFFER_SIZE];
+                        double batteryPercent = -1;
 
                         bool isHP = manufacturer?.IndexOf("HP", StringComparison.OrdinalIgnoreCase) >= 0;
 
@@ -83,11 +86,17 @@ namespace LGSTrayHID.HyperX
                         int ret = dev.Read(dataBuffer, DATA_BUFFER_SIZE, 1000);
                         if (ret <= 0)
                         {
+                            consecutiveFails++;
+                            if (consecutiveFails >= 2)
+                            {
+                                batteryPercent = -1; // treat as off/not active
+                            }
                             goto Publish;
                         }
 
                         int batteryRaw = (batteryByteIdx >= 0 && batteryByteIdx < ret) ? dataBuffer[batteryByteIdx] : -1;
-                        double batteryPercent = (batteryRaw >= 0 && batteryRaw <= 100) ? batteryRaw : -1;
+                        batteryPercent = (batteryRaw >= 0 && batteryRaw <= 100) ? batteryRaw : -1;
+                        consecutiveFails = 0;
 
 Publish:
                         publisher?.Invoke(

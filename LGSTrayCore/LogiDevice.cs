@@ -44,9 +44,12 @@ namespace LGSTrayCore
         {
             get
             {
-                string percentText = BatteryPercentage < 0
-                    ? "?%"
-                    : $"{(int)Math.Round(BatteryPercentage)}%";
+                if (BatteryPercentage < 0)
+                {
+                    return $"{DeviceName} — Off";
+                }
+
+                string percentText = $"{(int)Math.Round(BatteryPercentage)}%";
 
                 string header = $"{DeviceName} — {percentText}";
 

@@ -144,6 +144,17 @@ namespace LGSTrayHID
 
             if (_containerMap.TryGetValue(devPath, out var containerId))
             {
+                // Notify UI that device is now off/not active
+                HidppDeviceEvent?.Invoke(
+                    LGSTrayPrimitives.MessageStructs.IPCMessageType.UPDATE,
+                    new LGSTrayPrimitives.MessageStructs.UpdateMessage(
+                        containerId.ToString(),
+                        -1,
+                        LGSTrayPrimitives.PowerSupplyStatus.POWER_SUPPLY_STATUS_UNKNOWN,
+                        0,
+                        DateTimeOffset.Now
+                    )
+                );
                 _deviceMap[containerId].Dispose();
                 _deviceMap.Remove(containerId);
                 _containerMap.Remove(devPath);
