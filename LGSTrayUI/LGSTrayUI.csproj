@@ -21,6 +21,11 @@
     <Content Include="Resources\logo_black.ico" />
   </ItemGroup>
 
+  <!-- Ensure HID helper EXE is published alongside the tray app -->
+  <Target Name="CopyLGSTrayHIDOnPublish" AfterTargets="Publish">
+    <Exec Command="dotnet publish &quot;..\LGSTrayHID\LGSTrayHID.csproj&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -p:EnableCompressionInSingleFile=true -o $(PublishDir)" />
+  </Target>
+
   <ItemGroup>
     <Content Include="..\LGSTrayHID\libhidapi\*.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

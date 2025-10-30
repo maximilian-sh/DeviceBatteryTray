@@ -18,6 +18,9 @@ crashlog_*.log
 # User settings
 LGSTrayUI/Properties/Settings.user
 
+# Local clones/scratch
+HyperX-Cloud-2-Battery-Monitor/
+
 HIDPP_Bat_Mon/**
 
 # Native HID CPP daemon libs
