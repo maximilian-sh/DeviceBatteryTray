@@ -47,14 +47,6 @@ namespace LGSTrayHID
 
         private async Task<int> InitDevice(HidDeviceInfo deviceInfo)
         {
-            var messageType = (deviceInfo).GetHidppMessageType();
-            switch (messageType)
-            {
-                case HidppMessageType.NONE:
-                case HidppMessageType.VERY_LONG:
-                    return 0;
-            }
-
             string devPath = (deviceInfo).GetPath();
 
             HidDevicePtr dev = HidOpenPath(ref deviceInfo);
@@ -68,21 +60,48 @@ namespace LGSTrayHID
             Console.WriteLine();
 #endif
 
-            if (!_deviceMap.TryGetValue(containerId, out HidppDevices? value))
+            // Logitech path via HID++ interfaces
+            var messageType = (deviceInfo).GetHidppMessageType();
+            if (messageType is HidppMessageType.SHORT or HidppMessageType.LONG)
             {
-                value = new();
-                _deviceMap[containerId] = value;
-                _containerMap[devPath] = containerId;
+                if (!_deviceMap.TryGetValue(containerId, out HidppDevices? value))
+                {
+                    value = new();
+                    _deviceMap[containerId] = value;
+                    _containerMap[devPath] = containerId;
+                }
+
+                switch (messageType)
+                {
+                    case HidppMessageType.SHORT:
+                        await value.SetDevShort(dev);
+                        break;
+                    case HidppMessageType.LONG:
+                        await value.SetDevLong(dev);
+                        break;
+                }
+
+                return 0;
             }
 
-            switch (messageType)
+            // HyperX path: detect by known vendor IDs (Kingston/HP) and handle separately
+            if (deviceInfo.VendorId == 0x0951 || deviceInfo.VendorId == 0x03F0)
             {
-                case HidppMessageType.SHORT:
-                    await value.SetDevShort(dev);
-                    break;
-                case HidppMessageType.LONG:
-                    await value.SetDevLong(dev);
-                    break;
+                // Publish minimal init now; polling handled by HyperX handler
+                HidppDeviceEvent?.Invoke(
+                    LGSTrayPrimitives.MessageStructs.IPCMessageType.INIT,
+                    new LGSTrayPrimitives.MessageStructs.InitMessage(
+                        containerId.ToString(),
+                        "HyperX Wireless",
+                        true,
+                        LGSTrayPrimitives.DeviceType.Headset
+                    )
+                );
+
+                // Start polling in background (implementation inside HyperXDevice)
+                _ = HyperX.HyperXDevice.StartPollingAsync(dev, containerId, HidppDeviceEvent, CancellationToken.None);
+                _containerMap[devPath] = containerId;
+                return 0;
             }
 
             return 0;
@@ -120,8 +139,15 @@ namespace LGSTrayHID
 
             unsafe
             {
+                // Logitech
                 HidHotplugRegisterCallback(0x046D, 0x00, HidApiHotPlugEvent.HID_API_HOTPLUG_EVENT_DEVICE_ARRIVED, HidApiHotPlugFlag.HID_API_HOTPLUG_ENUMERATE, EnqueueDevice, IntPtr.Zero, (int*)IntPtr.Zero);
                 HidHotplugRegisterCallback(0x046D, 0x00, HidApiHotPlugEvent.HID_API_HOTPLUG_EVENT_DEVICE_LEFT, HidApiHotPlugFlag.NONE, DeviceLeft, IntPtr.Zero, (int*)IntPtr.Zero);
+                // HyperX (Kingston)
+                HidHotplugRegisterCallback(0x0951, 0x00, HidApiHotPlugEvent.HID_API_HOTPLUG_EVENT_DEVICE_ARRIVED, HidApiHotPlugFlag.HID_API_HOTPLUG_ENUMERATE, EnqueueDevice, IntPtr.Zero, (int*)IntPtr.Zero);
+                HidHotplugRegisterCallback(0x0951, 0x00, HidApiHotPlugEvent.HID_API_HOTPLUG_EVENT_DEVICE_LEFT, HidApiHotPlugFlag.NONE, DeviceLeft, IntPtr.Zero, (int*)IntPtr.Zero);
+                // HyperX (HP)
+                HidHotplugRegisterCallback(0x03F0, 0x00, HidApiHotPlugEvent.HID_API_HOTPLUG_EVENT_DEVICE_ARRIVED, HidApiHotPlugFlag.HID_API_HOTPLUG_ENUMERATE, EnqueueDevice, IntPtr.Zero, (int*)IntPtr.Zero);
+                HidHotplugRegisterCallback(0x03F0, 0x00, HidApiHotPlugEvent.HID_API_HOTPLUG_EVENT_DEVICE_LEFT, HidApiHotPlugFlag.NONE, DeviceLeft, IntPtr.Zero, (int*)IntPtr.Zero);
             }
         }
     
