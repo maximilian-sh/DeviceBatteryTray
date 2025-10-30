@@ -44,11 +44,23 @@ namespace LGSTrayCore
         {
             get
             {
-#if DEBUG
-                return $"{DeviceName}, {BatteryPercentage:f2}% - {LastUpdate}";
-#else
-                return $"{DeviceName}, {BatteryPercentage:f2}%";
-#endif
+                string percentText = BatteryPercentage < 0
+                    ? "?%"
+                    : $"{(int)Math.Round(BatteryPercentage)}%";
+
+                string header = $"{DeviceName} — {percentText}";
+
+                if (LastUpdate == DateTimeOffset.MinValue)
+                {
+                    return header;
+                }
+
+                var delta = DateTimeOffset.Now - LastUpdate;
+                string ago = delta.TotalMinutes < 1
+                    ? "Just now"
+                    : $"{(int)Math.Floor(delta.TotalMinutes)}m ago";
+
+                return $"{header}\nUpdated: {ago}";
             }
         }
 

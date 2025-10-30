@@ -1,14 +1,7 @@
 [UI]
 enableRichToolTips = true
 
-[HTTPServer]
-enabled = false
-addr = "localhost"
-port = 12321
-useIpv6 = true
-
-[GHub]
-enabled = false
+ 
 
 [Native]
 enabled = true
