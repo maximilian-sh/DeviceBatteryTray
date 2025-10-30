@@ -25,6 +25,22 @@ namespace LGSTrayHID.HidApi
             }
         }
 
+        internal static string GetManufacturerString(this HidDeviceInfo deviceInfo)
+        {
+            unsafe
+            {
+                return Marshal.PtrToStringUni((nint)deviceInfo.ManufacturerString) ?? string.Empty;
+            }
+        }
+
+        internal static string GetProductString(this HidDeviceInfo deviceInfo)
+        {
+            unsafe
+            {
+                return Marshal.PtrToStringUni((nint)deviceInfo.ProductString) ?? string.Empty;
+            }
+        }
+
         internal static HidppMessageType GetHidppMessageType(this HidDeviceInfo deviceInfo)
         {
             unsafe

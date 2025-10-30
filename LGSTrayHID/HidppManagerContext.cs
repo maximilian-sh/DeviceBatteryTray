@@ -87,19 +87,21 @@ namespace LGSTrayHID
             // HyperX path: detect by known vendor IDs (Kingston/HP) and handle separately
             if (deviceInfo.VendorId == 0x0951 || deviceInfo.VendorId == 0x03F0)
             {
+                string manufacturer = deviceInfo.GetManufacturerString();
+                string product = deviceInfo.GetProductString();
                 // Publish minimal init now; polling handled by HyperX handler
                 HidppDeviceEvent?.Invoke(
                     LGSTrayPrimitives.MessageStructs.IPCMessageType.INIT,
                     new LGSTrayPrimitives.MessageStructs.InitMessage(
                         containerId.ToString(),
-                        "HyperX Wireless",
+                        string.IsNullOrEmpty(product) ? "HyperX Wireless" : product,
                         true,
                         LGSTrayPrimitives.DeviceType.Headset
                     )
                 );
 
                 // Start polling in background (implementation inside HyperXDevice)
-                _ = HyperX.HyperXDevice.StartPollingAsync(dev, containerId, HidppDeviceEvent, CancellationToken.None);
+                _ = HyperX.HyperXDevice.StartPollingAsync(dev, containerId, manufacturer, product, HidppDeviceEvent, CancellationToken.None);
                 _containerMap[devPath] = containerId;
                 return 0;
             }

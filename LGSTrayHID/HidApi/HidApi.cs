@@ -46,6 +46,9 @@ namespace LGSTrayHID.HidApi
         [LibraryImport("hidapi", EntryPoint = "hid_read_timeout")]
         internal static unsafe partial int HidReadTimeOut(nint dev, [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2), Out] byte[] data, nuint length, int milliseconds);
 
+        [LibraryImport("hidapi", EntryPoint = "hid_get_input_report")]
+        internal static unsafe partial int HidGetInputReport(nint dev, [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2), In, Out] byte[] data, nuint length);
+
         [LibraryImport("hidapi", EntryPoint = "hid_version")]
         private static unsafe partial HidApiVersion* _HidVersion();
 

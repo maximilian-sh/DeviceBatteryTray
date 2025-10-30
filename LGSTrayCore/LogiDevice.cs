@@ -56,11 +56,13 @@ namespace LGSTrayCore
                 }
 
                 var delta = DateTimeOffset.Now - LastUpdate;
-                string ago = delta.TotalMinutes < 1
-                    ? "Just now"
-                    : $"{(int)Math.Floor(delta.TotalMinutes)}m ago";
+                if (delta.TotalMinutes >= 10)
+                {
+                    string ago = $"{(int)Math.Floor(delta.TotalMinutes)}m ago";
+                    return $"{header}\nUpdated: {ago}";
+                }
 
-                return $"{header}\nUpdated: {ago}";
+                return header;
             }
         }
 
