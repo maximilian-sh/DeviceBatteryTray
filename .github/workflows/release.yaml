@@ -1,3 +1,15 @@
+# Automatic Release Workflow
+# 
+# This workflow automatically builds and releases when the version is bumped:
+# 1. Runs on every push to master/main
+# 2. Reads VersionPrefix from LGSTrayUI/LGSTrayUI.csproj
+# 3. Compares it to the latest git tag (e.g., v4.0.2)
+# 4. If version is higher → builds, creates tag, and publishes GitHub release
+# 5. If version unchanged or lower → skips (no build/release)
+#
+# IMPORTANT: Do NOT create tags manually. The workflow handles tag creation automatically.
+# Just update VersionPrefix in the .csproj, commit, and push.
+
 name: Release on version bump
 
 on:
@@ -23,6 +35,8 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # Check if version was bumped by comparing VersionPrefix in .csproj to latest git tag
+      # Only proceeds with build/release if current version > latest tag version
       - name: Determine version and if release needed
         id: version_check
         shell: pwsh
@@ -89,6 +103,7 @@ jobs:
           "zip_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
         id: zip
 
+      # Automatically create git tag and GitHub release (workflow handles tag creation)
       - name: Create GitHub Release
         if: steps.version_check.outputs.release == 'True'
         uses: softprops/action-gh-release@v2

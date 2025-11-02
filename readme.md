@@ -86,6 +86,33 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\release.ps1 -Clean
 Artifacts:
 - Output: `LGSTrayUI\bin\Release\net8.0-windows\win-x64\standalone` (contains the EXE, `LGSTrayHID.exe`, `hidapi.dll`, `appsettings.toml`).
 
+## Releasing
+
+**The release workflow is fully automatic.** Just follow these steps:
+
+1. Update the version in `LGSTrayUI/LGSTrayUI.csproj`:
+   ```xml
+   <VersionPrefix>4.0.4</VersionPrefix>  <!-- Bump from current version -->
+   ```
+
+2. Stage, commit, and push:
+   ```bash
+   git add LGSTrayUI/LGSTrayUI.csproj
+   git commit -m "Bump version to 4.0.4"
+   git push origin master
+   ```
+
+3. The GitHub Actions workflow will automatically:
+   - Detect the version change
+   - Compare it to the latest git tag
+   - If the new version is higher → build, create tag, and publish release
+   - If unchanged or lower → skip (no build/release)
+
+**Important:**
+- Do NOT create git tags manually. The workflow creates tags automatically.
+- Do NOT push version bumps without changes, or the workflow will skip.
+- The workflow runs on every push to master, but only releases when version is bumped.
+
 ## Acknowledgements
 
 -   hidapi
