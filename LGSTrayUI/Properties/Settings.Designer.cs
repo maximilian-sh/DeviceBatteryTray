@@ -48,5 +48,29 @@ namespace LGSTrayUI.Properties {
                 this["NumericDisplay"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool AutoUpdateEnabled {
+            get {
+                return ((bool)(this["AutoUpdateEnabled"]));
+            }
+            set {
+                this["AutoUpdateEnabled"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0001-01-01T00:00:00")]
+        public global::System.DateTime LastUpdateCheck {
+            get {
+                return ((global::System.DateTime)(this["LastUpdateCheck"]));
+            }
+            set {
+                this["LastUpdateCheck"] = value;
+            }
+        }
     }
 }

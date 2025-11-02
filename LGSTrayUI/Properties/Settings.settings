@@ -11,5 +11,11 @@
     <Setting Name="NumericDisplay" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="AutoUpdateEnabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="LastUpdateCheck" Type="System.DateTime" Scope="User">
+      <Value Profile="(Default)">0001-01-01T00:00:00</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

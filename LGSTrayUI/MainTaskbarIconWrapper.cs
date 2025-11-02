@@ -51,6 +51,8 @@ public class MainTaskbarIconWrapper : IDisposable
 
     private TaskbarIcon? _taskbarIcon = new MainTaskBarIcon();
 
+    public TaskbarIcon? TaskbarIcon => _taskbarIcon;
+
     public MainTaskbarIconWrapper()
     {
         LogiDeviceIcon.RefCountChanged += OnRefCountChanged;

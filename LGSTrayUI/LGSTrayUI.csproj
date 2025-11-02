@@ -17,7 +17,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <VersionPrefix>4.0.3</VersionPrefix>
+    <VersionPrefix>5.0.0</VersionPrefix>
     <AssemblyName>DeviceBatteryTray</AssemblyName>
     <ApplicationIcon>Resources\logo_black.ico</ApplicationIcon>
   </PropertyGroup>
@@ -33,6 +33,10 @@
     <Copy SourceFiles="..\LGSTrayHID\libhidapi\hidapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
     <!-- Ensure appsettings.toml is in publish directory -->
     <Copy SourceFiles="appsettings.toml" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('appsettings.toml')" />
+    <!-- Copy installer/uninstaller scripts and documentation to publish directory -->
+    <Copy SourceFiles="..\scripts\install.ps1" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('..\scripts\install.ps1')" />
+    <Copy SourceFiles="..\scripts\uninstall.ps1" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('..\scripts\uninstall.ps1')" />
+    <Copy SourceFiles="..\INSTALL.txt" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('..\INSTALL.txt')" />
   </Target>
 
   <ItemGroup>

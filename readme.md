@@ -4,18 +4,44 @@ Minimal Windows tray app that shows battery for supported USB HID devices using 
 
 ## Install
 
-1) Download the latest `DeviceBatteryTray-vX.Y.Z-win-x64.zip` from Releases.
-2) Extract the ZIP anywhere you like (no installer required).
-3) **First-time setup (Windows SmartScreen):**
-   - Windows may block the app because it was downloaded from the internet. You'll need to allow both executables:
-   - Right-click `DeviceBatteryTray.exe` → Properties → Unblock (if shown), then run it and allow it when prompted.
-   - **Important:** Also right-click `LGSTrayHID.exe` → Properties → Unblock (if shown), then run it once manually to allow it. This is required because the main app launches this helper process.
-4) Run `DeviceBatteryTray.exe` normally after allowing both executables.
+### Option 1: Automated Installer (Recommended)
 
-Notes:
-- The folder must contain these files next to the EXE: `LGSTrayHID.exe`, `hidapi.dll`, `appsettings.toml`.
-- The shipped build is self-contained (.NET 8 not required).
-- After the first run, Windows will remember both executables and you won't need to unblock them again.
+1) Download the latest `DeviceBatteryTray-vX.Y.Z-win-x64.zip` from Releases.
+
+2) Extract the ZIP and run `install.ps1`:
+   - **For current user install:** Right-click `install.ps1` → Run with PowerShell
+     - Installs to `%LOCALAPPDATA%\DeviceBatteryTray\`
+   - **For system-wide install:** Right-click PowerShell → Run as Administrator, then:
+     ```powershell
+     cd "C:\path\to\extracted\folder"
+     .\install.ps1 -ProgramFiles
+     ```
+     - Installs to `C:\Program Files\DeviceBatteryTray\`
+
+The installer will:
+- Extract files to the proper location
+- Unblock both executables (no manual SmartScreen steps needed)
+- Create desktop and Start Menu shortcuts
+- Optionally enable auto-start with Windows
+
+### Option 2: Manual Install
+
+1) Download the latest `DeviceBatteryTray-vX.Y.Z-win-x64.zip` from Releases.
+
+2) Extract the ZIP to a permanent location:
+   - `%LOCALAPPDATA%\DeviceBatteryTray\` (recommended for per-user)
+   - `C:\Program Files\DeviceBatteryTray\` (requires admin)
+
+3) **First-time setup (Windows SmartScreen):**
+   - Right-click `DeviceBatteryTray.exe` → Properties → Unblock (if shown)
+   - Right-click `LGSTrayHID.exe` → Properties → Unblock (if shown)
+
+4) Run `DeviceBatteryTray.exe`
+
+**Notes:**
+- The folder must contain these files: `DeviceBatteryTray.exe`, `LGSTrayHID.exe`, `hidapi.dll`, `appsettings.toml`
+- The shipped build is self-contained (.NET 8 not required)
+- The automated installer handles everything automatically
 
 ## Devices
 
@@ -62,6 +88,22 @@ pollPeriod = 120
 disabledDevices = [
 ]
 ```
+
+## Auto-Start with Windows
+
+The app can be configured to start automatically when Windows starts. Use the tray menu option "Autostart with Windows" to enable/disable it.
+
+**Registry Location (for manual inspection/cleanup):**
+- Registry key: `HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
+- Value name: `DeviceBatteryTray`
+- Value data: Full path to `DeviceBatteryTray.exe`
+
+To manually view or edit:
+1. Press `Win + R`, type `regedit`, press Enter
+2. Navigate to: `HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
+3. Look for the `DeviceBatteryTray` entry
+
+**Note:** The app automatically validates and cleans up invalid registry entries (from old versions or moved installations) on startup. If you moved the app to a different location, the old registry entry will be automatically removed.
 
 ## Known Notes
 

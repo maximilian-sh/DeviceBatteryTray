@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using System;
 using System.Collections.Specialized;
 
 namespace LGSTrayUI
@@ -39,6 +40,28 @@ namespace LGSTrayUI
             Properties.Settings.Default.Save();
 
             OnPropertyChanged(nameof(SelectedDevices));
+        }
+
+        public bool AutoUpdateEnabled
+        {
+            get => Properties.Settings.Default.AutoUpdateEnabled;
+            set
+            {
+                Properties.Settings.Default.AutoUpdateEnabled = value;
+                Properties.Settings.Default.Save();
+                OnPropertyChanged();
+            }
+        }
+
+        public DateTime LastUpdateCheck
+        {
+            get => Properties.Settings.Default.LastUpdateCheck;
+            set
+            {
+                Properties.Settings.Default.LastUpdateCheck = value;
+                Properties.Settings.Default.Save();
+                OnPropertyChanged();
+            }
         }
     }
 }
