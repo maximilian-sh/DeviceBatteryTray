@@ -138,6 +138,7 @@ namespace LGSTrayUI
         private UpdateInfo? _availableUpdate;
         
         public bool UpdateAvailable => _availableUpdate != null && _availableUpdate.IsNewer;
+        public string AvailableUpdateVersion => _availableUpdate != null ? $"Download v{_availableUpdate.Version}" : "Download Update";
         private CancellationTokenSource? _updateCheckCts;
         private Timer? _updateCheckTimer;
 
@@ -287,35 +288,48 @@ namespace LGSTrayUI
 
                 var updateInfo = await UpdateChecker.CheckForUpdatesAsync(_updateCheckCts.Token);
                 _userSettings.LastUpdateCheck = DateTime.Now;
-
-                if (updateInfo == null)
+                
+                // Ensure UI updates are on the UI thread
+                Application.Current.Dispatcher.Invoke(() =>
                 {
-                    ShowBalloonTip("Update Check Failed", "Unable to check for updates. Please check your internet connection.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Warning);
-                    // Clear any old update
-                    _availableUpdate = null;
-                    OnPropertyChanged(nameof(UpdateAvailable));
-                }
-                else if (!updateInfo.IsNewer)
-                {
-                    ShowBalloonTip("Up to Date", $"You are running the latest version ({AssemblyVersion}).", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
-                    // Clear any old update
-                    _availableUpdate = null;
-                    OnPropertyChanged(nameof(UpdateAvailable));
-                }
-                else
-                {
-                    _availableUpdate = updateInfo;
-                    OnPropertyChanged(nameof(UpdateAvailable));
-                    ShowUpdateNotification(updateInfo);
-                }
+                    if (updateInfo == null)
+                    {
+                        ShowBalloonTip("Update Check Failed", "Unable to check for updates. Please check your internet connection.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Warning);
+                        // Clear any old update
+                        _availableUpdate = null;
+                        OnPropertyChanged(nameof(UpdateAvailable));
+                        OnPropertyChanged(nameof(AvailableUpdateVersion));
+                    }
+                    else if (!updateInfo.IsNewer)
+                    {
+                        ShowBalloonTip("Up to Date", $"You are running the latest version ({AssemblyVersion}).", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
+                        // Clear any old update
+                        _availableUpdate = null;
+                        OnPropertyChanged(nameof(UpdateAvailable));
+                        OnPropertyChanged(nameof(AvailableUpdateVersion));
+                    }
+                    else
+                    {
+                        _availableUpdate = updateInfo;
+                        OnPropertyChanged(nameof(UpdateAvailable));
+                        OnPropertyChanged(nameof(AvailableUpdateVersion));
+                        ShowUpdateNotification(updateInfo);
+                    }
+                });
             }
             catch (Exception ex)
             {
-                ShowBalloonTip("Update Check Error", $"Error checking for updates: {ex.Message}", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    ShowBalloonTip("Update Check Error", $"Error checking for updates: {ex.Message}", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                });
             }
             finally
             {
-                CheckingForUpdates = false;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    CheckingForUpdates = false;
+                });
             }
         }
 
@@ -328,16 +342,31 @@ namespace LGSTrayUI
             }
 
             CheckingForUpdates = true;
-            ShowBalloonTip("Downloading Update", $"Downloading version {_availableUpdate.Version}...", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
+
+            // Create and show progress window
+            UpdateProgressWindow? progressWindow = null;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                progressWindow = new UpdateProgressWindow(_availableUpdate.Version)
+                {
+                    Owner = null // No owner to prevent closing issues
+                };
+                progressWindow.Show();
+            });
 
             try
             {
                 var progress = new Progress<int>(percent =>
                 {
-                    if (percent % 10 == 0 || percent == 100) // Update every 10% to avoid spam
+                    Application.Current.Dispatcher.Invoke(() =>
                     {
-                        ShowBalloonTip("Downloading Update", $"Downloading version {_availableUpdate.Version}... {percent}%", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
-                    }
+                        progressWindow?.UpdateProgress(percent, "Downloading update...");
+                    });
+                });
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    progressWindow?.SetStatus("Downloading update...");
                 });
 
                 var extractedPath = await UpdateChecker.DownloadUpdateAsync(
@@ -347,21 +376,43 @@ namespace LGSTrayUI
 
                 if (string.IsNullOrEmpty(extractedPath))
                 {
-                    ShowBalloonTip("Download Failed", "Failed to download update. Please try again later.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        progressWindow?.Close();
+                        ShowBalloonTip("Download Failed", "Failed to download update. Please try again later.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                    });
+                    CheckingForUpdates = false;
                     return;
                 }
 
-                ShowBalloonTip("Installing Update", "Update downloaded. The application will restart shortly...", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    progressWindow?.UpdateProgress(100, "Installing update...");
+                    progressWindow?.SetStatus("Installing update. The application will restart shortly...");
+                });
+
+                // Small delay to show 100% and installation message
+                await Task.Delay(500);
+                
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    progressWindow?.Close();
+                });
                 
                 // Clear the available update since we're installing it
                 _availableUpdate = null;
                 OnPropertyChanged(nameof(UpdateAvailable));
+                OnPropertyChanged(nameof(AvailableUpdateVersion));
                 
                 InstallUpdate(extractedPath);
             }
             catch (Exception ex)
             {
-                ShowBalloonTip("Download Error", $"Error downloading update: {ex.Message}", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    progressWindow?.Close();
+                    ShowBalloonTip("Download Error", $"Error downloading update: {ex.Message}", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                });
                 CheckingForUpdates = false;
             }
         }
@@ -369,7 +420,7 @@ namespace LGSTrayUI
         private void ShowUpdateNotification(UpdateInfo updateInfo)
         {
             var title = $"Update Available: v{updateInfo.Version}";
-            var message = "A new version is available. Click 'Download Update' in the menu to install.";
+            var message = $"A new version ({updateInfo.Version}) is available.\nClick 'Download v{updateInfo.Version}' in the menu to install.";
             ShowBalloonTip(title, message, Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
         }
 

@@ -1,0 +1,23 @@
+<Window x:Class="LGSTrayUI.UpdateProgressWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Updating DeviceBatteryTray" Height="200" Width="400"
+        ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True" Topmost="True">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <TextBlock Grid.Row="0" Text="{Binding StatusText}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+        <TextBlock Grid.Row="1" Text="{Binding VersionText}" FontSize="12" Foreground="Gray" Margin="0,0,0,15"/>
+        
+        <ProgressBar Grid.Row="2" Height="20" Value="{Binding Progress}" Minimum="0" Maximum="100" Margin="0,0,0,10"/>
+        
+        <TextBlock Grid.Row="3" Text="{Binding ProgressText}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12"/>
+    </Grid>
+</Window>
+
