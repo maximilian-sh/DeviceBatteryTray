@@ -354,15 +354,25 @@ namespace LGSTrayUI
         {
             var logFile = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
             
-            // Initialize log file at the very start
+            // Initialize log file at the very start - ensure it's created with proper error handling
+            EnsureLogFileExists(logFile);
             try
             {
-                File.WriteAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ========================================\n");
+                File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ========================================\n");
                 File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] UPDATE PROCESS STARTED\n");
                 File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Current version: {AssemblyVersion}\n");
                 File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ========================================\n\n");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Try to write error to a fallback location if main log fails
+                try
+                {
+                    var fallbackLog = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "DeviceBatteryTray_Update_Fallback.log");
+                    File.AppendAllText(fallbackLog, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Failed to write to main log: {ex.Message}\n");
+                }
+                catch { }
+            }
             
             if (_availableUpdate == null)
             {
@@ -534,9 +544,10 @@ namespace LGSTrayUI
                 var logFileQuoted = $"\"{logFile}\"";
                 
                 // Initialize log file
+                EnsureLogFileExists(logFile);
                 try
                 {
-                    File.WriteAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Update process initialized\n");
+                    File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Update process initialized\n");
                     File.AppendAllText(logFile, $"Log file location: {logFile}\n");
                 }
                 catch
@@ -755,11 +766,35 @@ del ""%~f0""
             }
         }
 
+        private static void EnsureLogFileExists(string logFile)
+        {
+            try
+            {
+                if (!File.Exists(logFile))
+                {
+                    // Ensure temp directory exists
+                    var tempDir = Path.GetDirectoryName(logFile);
+                    if (!string.IsNullOrEmpty(tempDir) && !Directory.Exists(tempDir))
+                    {
+                        Directory.CreateDirectory(tempDir);
+                    }
+                    // Create empty log file
+                    File.WriteAllText(logFile, "");
+                }
+            }
+            catch
+            {
+                // Ignore - will try again on next write
+            }
+        }
+
         private void LogUpdateInfo(string message, params string[] details)
         {
             try
             {
                 var logFile = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
+                EnsureLogFileExists(logFile);
+                
                 var logLines = new List<string>
                 {
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}"
@@ -783,6 +818,8 @@ del ""%~f0""
             try
             {
                 var logFile = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
+                EnsureLogFileExists(logFile);
+                
                 var logLines = new List<string>
                 {
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR: {message}"

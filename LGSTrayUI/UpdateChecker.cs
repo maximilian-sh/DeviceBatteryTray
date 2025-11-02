@@ -130,6 +130,16 @@ namespace LGSTrayUI
         {
             try
             {
+                // Ensure log file exists before writing
+                if (!File.Exists(logFile))
+                {
+                    var tempDir = Path.GetDirectoryName(logFile);
+                    if (!string.IsNullOrEmpty(tempDir) && !Directory.Exists(tempDir))
+                    {
+                        Directory.CreateDirectory(tempDir);
+                    }
+                    File.WriteAllText(logFile, "");
+                }
                 File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
             }
             catch { }
@@ -263,6 +273,15 @@ namespace LGSTrayUI
                 try
                 {
                     var logPath = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
+                    if (!File.Exists(logPath))
+                    {
+                        var tempDir = Path.GetDirectoryName(logPath);
+                        if (!string.IsNullOrEmpty(tempDir) && !Directory.Exists(tempDir))
+                        {
+                            Directory.CreateDirectory(tempDir);
+                        }
+                        File.WriteAllText(logPath, "");
+                    }
                     File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR: Download failed: {ex.GetType().Name} - {ex.Message}\n{ex}\n");
                 }
                 catch { }
