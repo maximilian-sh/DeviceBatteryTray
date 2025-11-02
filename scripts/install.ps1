@@ -53,17 +53,35 @@ if ($ProgramFiles) {
 
 Write-Host "Installing DeviceBatteryTray to: $installDir" -ForegroundColor Cyan
 
-# Find the ZIP file in the same directory as this script
+# Find the ZIP file or extracted files in the same directory as this script
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$zipFile = Get-ChildItem -Path $scriptDir -Filter "DeviceBatteryTray-v*-win-x64.zip" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$zipFile = Get-ChildItem -Path $scriptDir -Filter "DeviceBatteryTray-v*-win-x64.zip" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
-if (-not $zipFile) {
-    Write-Host "Error: Could not find DeviceBatteryTray ZIP file in the script directory." -ForegroundColor Red
-    Write-Host "Please ensure the ZIP file is in the same folder as install.ps1" -ForegroundColor Yellow
+# Check if required files are already extracted in the script directory
+$requiredFiles = @("DeviceBatteryTray.exe", "LGSTrayHID.exe", "hidapi.dll")
+$allFilesPresent = $true
+foreach ($file in $requiredFiles) {
+    if (-not (Test-Path (Join-Path $scriptDir $file))) {
+        $allFilesPresent = $false
+        break
+    }
+}
+
+if (-not $zipFile -and -not $allFilesPresent) {
+    Write-Host "Error: Could not find DeviceBatteryTray ZIP file or extracted files." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Please do ONE of the following:" -ForegroundColor Yellow
+    Write-Host "  1. Ensure the ZIP file is in the same folder as install.bat" -ForegroundColor Cyan
+    Write-Host "  2. OR extract the ZIP file before running install.bat" -ForegroundColor Cyan
+    Write-Host ""
     exit 1
 }
 
-Write-Host "Found ZIP: $($zipFile.Name)" -ForegroundColor Green
+if ($zipFile) {
+    Write-Host "Found ZIP: $($zipFile.Name)" -ForegroundColor Green
+} else {
+    Write-Host "Found extracted files in current directory" -ForegroundColor Green
+}
 
 # Clean up old installation directory and any ClickOnce-style folders
 if (Test-Path $installDir) {
@@ -83,9 +101,22 @@ if ($parentDir -and (Test-Path $parentDir)) {
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 Write-Host "Created installation directory: $installDir" -ForegroundColor Green
 
-# Extract ZIP
-Write-Host "Extracting files..." -ForegroundColor Cyan
-Expand-Archive -Path $zipFile.FullName -DestinationPath $installDir -Force
+# Copy files from ZIP or extracted directory
+if ($zipFile) {
+    # Extract ZIP
+    Write-Host "Extracting files from ZIP..." -ForegroundColor Cyan
+    Expand-Archive -Path $zipFile.FullName -DestinationPath $installDir -Force
+} else {
+    # Copy already-extracted files
+    Write-Host "Copying files from current directory..." -ForegroundColor Cyan
+    $filesToCopy = @("DeviceBatteryTray.exe", "LGSTrayHID.exe", "hidapi.dll", "appsettings.toml", "install.ps1", "install.bat", "uninstall.ps1", "uninstall.bat", "INSTALL.txt")
+    foreach ($file in $filesToCopy) {
+        $sourcePath = Join-Path $scriptDir $file
+        if (Test-Path $sourcePath) {
+            Copy-Item -Path $sourcePath -Destination $installDir -Force
+        }
+    }
+}
 
 # Unblock all files (remove Zone.Identifier)
 Write-Host "Unblocking files..." -ForegroundColor Cyan
