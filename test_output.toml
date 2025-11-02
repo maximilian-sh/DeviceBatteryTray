@@ -1,0 +1,100 @@
+﻿â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                        DeviceBatteryTray Configuration
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+This file controls the behavior of DeviceBatteryTray.
+For TOML syntax reference: https://toml.io/en/
+
+âš ï¸  IMPORTANT: Invalid syntax will cause the app to reset this file to defaults.
+   Make sure to:
+   - Use proper TOML syntax
+   - Don't remove section headers ([UI], [Native])
+   - Use correct value types (true/false for booleans, numbers for integers)
+
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                               UI SETTINGS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+[UI]
+
+# Show detailed tooltips with battery percentage and last update time
+#
+# When enabled: Shows "Device Name â€” XX% | Updated: Xm ago" in tooltip
+#               (only shows update time if >10 minutes)
+# When disabled: Shows simple tooltip without detailed information
+#
+# Type: boolean (true/false)
+# Default: true
+enableRichToolTips = true
+
+
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                        NATIVE HID DEVICE MANAGER
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+[Native]
+
+# Enable/disable device detection and battery monitoring
+#
+# Set to false to completely disable the native HID device manager.
+# The app will not detect or monitor any devices when disabled.
+#
+# Type: boolean (true/false)
+# Default: true
+enabled = true
+
+
+# Time in seconds between poll attempts when a device is off/unavailable
+#
+# This controls how often the app checks if a missing device has come back.
+# 
+# Lower values (e.g., 2-5 seconds):
+#   âœ“ Faster detection when device reconnects
+#   âœ— More CPU usage while device is missing
+#
+# Higher values (e.g., 10-30 seconds):
+#   âœ“ Less CPU usage
+#   âœ— Slower to detect when device comes back
+#
+# Type: integer (seconds)
+# Default: 5
+# Recommended: 5-10 seconds
+retryTime = 5
+
+
+# Time in seconds between battery polls when a device is connected and available
+#
+# This controls how often the app checks the battery level of connected devices.
+#
+# Lower values (e.g., 30-60 seconds):
+#   âœ“ More frequent battery updates
+#   âœ— More CPU/battery usage
+#
+# Higher values (e.g., 180-300 seconds):
+#   âœ“ Less CPU/battery usage
+#   âœ— Less frequent updates (battery level may be outdated)
+#
+# Type: integer (seconds)
+# Default: 120 (2 minutes)
+# Recommended: 120-300 seconds (2-5 minutes)
+pollPeriod = 120
+
+
+# List of device name substrings to ignore (case-insensitive)
+#
+# Devices matching ANY substring in this list will be completely ignored.
+# Useful for filtering out duplicate devices or devices you don't want to monitor.
+#
+# Examples:
+#   disabledDevices = ["G502"]              # Ignore all devices with "G502" in name
+#   disabledDevices = ["Test", "Backup"]    # Ignore devices with "Test" OR "Backup"
+#   disabledDevices = []                    # Don't ignore any devices (empty list)
+#
+# Type: array of strings
+# Default: [] (empty list)
+# Format: Each device name substring on a separate line, in quotes, comma-separated
+disabledDevices = [
+    # "G502",
+    # "Test Device",
+    # "Backup Mouse",
+]

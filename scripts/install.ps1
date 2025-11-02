@@ -113,15 +113,104 @@ if ($zipFile) {
     foreach ($file in $filesToCopy) {
         $sourcePath = Join-Path $scriptDir $file
         if (Test-Path $sourcePath) {
-            Copy-Item -Path $sourcePath -Destination $installDir -Force
+            $destPath = Join-Path $installDir $file
+            Copy-Item -Path $sourcePath -Destination $destPath -Force
+            
+            # Ensure file is not read-only and has proper permissions
+            try {
+                $fileInfo = Get-Item $destPath
+                $fileInfo.IsReadOnly = $false
+                # Ensure current user has full control
+                $acl = Get-Acl $destPath
+                $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($env:USERNAME, "FullControl", "Allow")
+                $acl.SetAccessRule($accessRule)
+                Set-Acl -Path $destPath -AclObject $acl
+            } catch {
+                Write-Host "  Warning: Could not set permissions for $file" -ForegroundColor Yellow
+            }
+            
+            Write-Host "  Copied: $file" -ForegroundColor Gray
         }
     }
 }
 
-# Unblock all files (remove Zone.Identifier)
-Write-Host "Unblocking files..." -ForegroundColor Cyan
-Get-ChildItem -Path $installDir -Recurse -File | ForEach-Object {
-    Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue
+# Unblock all files (remove Zone.Identifier) - critical for SmartScreen and file access
+Write-Host "Unblocking files (removing download security flags)..." -ForegroundColor Cyan
+if ($zipFile) {
+    # If extracting from ZIP, unblock after extraction
+    Get-ChildItem -Path $installDir -Recurse -File | ForEach-Object {
+        $unblocked = $false
+        try {
+            Unblock-File -Path $_.FullName -ErrorAction Stop
+            $unblocked = $true
+            Write-Host "  Unblocked: $($_.Name)" -ForegroundColor Gray
+        } catch {
+            Write-Host "  Warning: Could not unblock $($_.Name)" -ForegroundColor Yellow
+        }
+        
+        # Also remove any Zone.Identifier alternate data stream manually if needed
+        $zoneIdPath = "$($_.FullName):Zone.Identifier"
+        if (Test-Path $zoneIdPath) {
+            try {
+                Remove-Item $zoneIdPath -Force -ErrorAction Stop
+            } catch {
+                # Ignore if we can't remove it
+            }
+        }
+    }
+} else {
+    # If copying files, unblock them first in source, then copy
+    Get-ChildItem -Path $scriptDir -File | ForEach-Object {
+        try {
+            Unblock-File -Path $_.FullName -ErrorAction Stop
+        } catch {
+            Write-Host "  Warning: Could not unblock source file $($_.Name)" -ForegroundColor Yellow
+        }
+        
+        # Remove Zone.Identifier from source
+        $zoneIdPath = "$($_.FullName):Zone.Identifier"
+        if (Test-Path $zoneIdPath) {
+            try {
+                Remove-Item $zoneIdPath -Force -ErrorAction Stop
+            } catch {
+                # Ignore
+            }
+        }
+    }
+}
+
+# Verify appsettings.toml was copied and set proper permissions
+$settingsPath = Join-Path $installDir "appsettings.toml"
+if (-not (Test-Path $settingsPath)) {
+    Write-Host "Warning: appsettings.toml not found. It will be created automatically on first run." -ForegroundColor Yellow
+} else {
+    # Ensure appsettings.toml is not read-only and can be written with full permissions
+    try {
+        $fileInfo = Get-Item $settingsPath
+        $fileInfo.IsReadOnly = $false
+        
+        # Set explicit full control permissions for current user
+        # First, remove any existing deny rules
+        $acl = Get-Acl $settingsPath
+        $acl.SetAccessRuleProtection($false, $true)  # Remove inherited permissions protection temporarily
+        $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($env:USERNAME, "FullControl", "Allow")
+        $acl.SetAccessRule($accessRule)
+        $acl.SetAccessRuleProtection($false, $false)  # Keep inheritance enabled
+        Set-Acl -Path $settingsPath -AclObject $acl
+        
+        # Also ensure the installation directory itself has proper permissions
+        $dirAcl = Get-Acl $installDir
+        $dirAcl.SetAccessRuleProtection($false, $true)  # Remove inherited permissions protection temporarily
+        $dirAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($env:USERNAME, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $dirAcl.SetAccessRule($dirAccessRule)
+        $dirAcl.SetAccessRuleProtection($false, $false)  # Keep inheritance enabled
+        Set-Acl -Path $installDir -AclObject $dirAcl
+        
+        Write-Host "Set explicit permissions on appsettings.toml and directory" -ForegroundColor Gray
+    } catch {
+        Write-Host "Warning: Could not set appsettings.toml permissions: $_" -ForegroundColor Yellow
+        Write-Host "The app may need to be run as administrator to set permissions correctly." -ForegroundColor Yellow
+    }
 }
 
 # Verify critical files
@@ -191,34 +280,85 @@ if ($autoStartResponse -eq "Y" -or $autoStartResponse -eq "y") {
     Write-Host "Auto-start enabled" -ForegroundColor Green
 }
 
-# Run both executables briefly to trigger SmartScreen acceptance prompts
+# Run both executables to trigger SmartScreen acceptance prompts (if needed)
 Write-Host ""
-Write-Host "Triggering Windows SmartScreen prompts (this is normal and safe)..." -ForegroundColor Cyan
-Write-Host "You may see security prompts - please click 'Run' or 'More info' → 'Run anyway' for both executables." -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "SMARTSCREEN SETUP" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
+Write-Host "Windows SmartScreen may show security prompts for downloaded executables." -ForegroundColor Yellow
+Write-Host "This is normal and safe. We'll test both executables now." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "If you see a SmartScreen prompt:" -ForegroundColor Yellow
+Write-Host "  - Click 'More info' (if shown)" -ForegroundColor White
+Write-Host "  - Then click 'Run anyway'" -ForegroundColor White
+Write-Host ""
+Write-Host "NOTE: If no prompts appear, the files are already trusted (this is fine)." -ForegroundColor Gray
+Write-Host ""
+Write-Host "Press any key to test LGSTrayHID.exe..."
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
-# Start LGSTrayHID first, then main app (both need to be accepted)
+# Test LGSTrayHID.exe - SmartScreen may or may not appear
 $hidExePath = Join-Path $installDir "LGSTrayHID.exe"
 if (Test-Path $hidExePath) {
-    Write-Host "Starting LGSTrayHID.exe to trigger SmartScreen..." -ForegroundColor Cyan
-    $hidProcess = Start-Process -FilePath $hidExePath -WorkingDirectory $installDir -PassThru -WindowStyle Minimized
-    Start-Sleep -Seconds 2
-    if (-not $hidProcess.HasExited) {
-        Stop-Process -Id $hidProcess.Id -Force -ErrorAction SilentlyContinue
+    Write-Host ""
+    Write-Host "Testing LGSTrayHID.exe..." -ForegroundColor Cyan
+    try {
+        # Start process - SmartScreen will intercept if needed
+        $hidProcess = Start-Process -FilePath $hidExePath -WorkingDirectory $installDir -PassThru -WindowStyle Minimized -ErrorAction Stop
+        
+        # Give SmartScreen time to show (usually appears within 1-2 seconds if it will)
+        Start-Sleep -Seconds 3
+        
+        # Check if process is running
+        try {
+            $proc = Get-Process -Id $hidProcess.Id -ErrorAction Stop
+            if ($proc -ne $null) {
+                Write-Host "LGSTrayHID.exe started successfully (no SmartScreen block)" -ForegroundColor Green
+                Start-Sleep -Seconds 1
+                Stop-Process -Id $hidProcess.Id -Force -ErrorAction SilentlyContinue
+            }
+        } catch {
+            # Process doesn't exist - might have been blocked by SmartScreen or exited quickly
+            Write-Host "LGSTrayHID.exe test complete" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "Could not start LGSTrayHID.exe: $_" -ForegroundColor Yellow
     }
+} else {
+    Write-Host "LGSTrayHID.exe not found - skipping test" -ForegroundColor Yellow
 }
 
-# Start main app briefly
-Write-Host "Starting DeviceBatteryTray.exe to trigger SmartScreen..." -ForegroundColor Cyan
-$mainProcess = Start-Process -FilePath $exePath -WorkingDirectory $installDir -PassThru -WindowStyle Minimized
-Start-Sleep -Seconds 3
-if (-not $mainProcess.HasExited) {
-    Stop-Process -Id $mainProcess.Id -Force -ErrorAction SilentlyContinue
-    Write-Host "DeviceBatteryTray accepted by Windows. It will start properly on next launch." -ForegroundColor Green
+Write-Host ""
+Write-Host "Press any key to test DeviceBatteryTray.exe..."
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+# Test main app
+Write-Host ""
+Write-Host "Testing DeviceBatteryTray.exe..." -ForegroundColor Cyan
+try {
+    $mainProcess = Start-Process -FilePath $exePath -WorkingDirectory $installDir -PassThru -WindowStyle Minimized -ErrorAction Stop
+    
+    # Give SmartScreen time to show
+    Start-Sleep -Seconds 3
+    
+    try {
+        $proc = Get-Process -Id $mainProcess.Id -ErrorAction Stop
+        if ($proc -ne $null) {
+            Write-Host "DeviceBatteryTray.exe started successfully (no SmartScreen block)" -ForegroundColor Green
+            Start-Sleep -Seconds 1
+            Stop-Process -Id $mainProcess.Id -Force -ErrorAction SilentlyContinue
+        }
+    } catch {
+        Write-Host "DeviceBatteryTray.exe test complete" -ForegroundColor Green
+    }
+} catch {
+    Write-Host "Could not start DeviceBatteryTray.exe: $_" -ForegroundColor Yellow
 }
 
 Write-Host ""
 Write-Host "SmartScreen setup complete!" -ForegroundColor Green
+Write-Host "If no prompts appeared, the files are already trusted (this is normal)." -ForegroundColor Gray
 Write-Host ""
 
 # Ask if user wants to start the app now

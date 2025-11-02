@@ -12,15 +12,10 @@ public class UISettings
     public bool EnableRichToolTips { get; set; }
 }
 
-public class IDeviceManagerSettings
+public class NativeDeviceManagerSettings
 {
-    public bool Enabled { get; set; }
-}
-
-public class NativeDeviceManagerSettings : IDeviceManagerSettings
-{
-    public int RetryTime { get; set; } = 10;
-    public int PollPeriod { get; set; } = 600;
+    public int RetryTime { get; set; } = 5;
+    public int PollPeriod { get; set; } = 120;
 
     public IEnumerable<string> DisabledDevices { get; set; } = [];
 }

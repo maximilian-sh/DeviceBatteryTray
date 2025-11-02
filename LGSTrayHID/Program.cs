@@ -18,7 +18,15 @@ namespace LGSTrayHID
         static async Task Main(string[] args)
         {
             var builder = Host.CreateEmptyApplicationBuilder(null);
-            builder.Configuration.AddTomlFile("appsettings.toml");
+            try
+            {
+                builder.Configuration.AddTomlFile("appsettings.toml");
+            }
+            catch
+            {
+                // If settings file can't be loaded, continue with defaults
+                // The main app will handle fixing the file
+            }
 
             GlobalSettings.settings = builder.Configuration.GetSection("Native")
                 .Get<NativeDeviceManagerSettings>() ?? GlobalSettings.settings;
