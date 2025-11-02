@@ -55,7 +55,7 @@ namespace LGSTrayUI
             {
                 if (_autoStart == null)
                 {
-                    RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey(AutoStartRegKey, true);
+                    using RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey(AutoStartRegKey, false);
                     _autoStart = registryKey?.GetValue(AutoStartRegKeyValue) != null;
                 }
 
@@ -63,7 +63,7 @@ namespace LGSTrayUI
             }
             set
             {
-                RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey(AutoStartRegKey, true);
+                using RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey(AutoStartRegKey, true);
 
                 if (registryKey == null)
                 {
@@ -72,7 +72,7 @@ namespace LGSTrayUI
 
                 if (value)
                 {
-                    registryKey.SetValue(AutoStartRegKeyValue, Path.Combine(AppContext.BaseDirectory, Environment.ProcessPath!));
+                    registryKey.SetValue(AutoStartRegKeyValue, Environment.ProcessPath!);
                 }
                 else
                 {
@@ -80,6 +80,7 @@ namespace LGSTrayUI
                 }
 
                 _autoStart = value;
+                OnPropertyChanged();
             }
         }
 
