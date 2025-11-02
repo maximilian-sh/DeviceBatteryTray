@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -104,11 +105,21 @@ namespace LGSTrayUI
             }
 
             string? registryPath = regValue.ToString();
+            if (string.IsNullOrEmpty(registryPath))
+            {
+                return false;
+            }
+
+            // Remove surrounding quotes if present (Windows Run keys sometimes have quotes)
+            registryPath = registryPath.Trim('"', '\'');
             string currentPath = Environment.ProcessPath!;
 
+            // Normalize paths for comparison (get full paths and compare case-insensitively)
+            string normalizedRegistryPath = Path.GetFullPath(registryPath);
+            string normalizedCurrentPath = Path.GetFullPath(currentPath);
+
             // Validate that the registry entry points to the current executable
-            if (string.IsNullOrEmpty(registryPath) || 
-                !Path.GetFullPath(registryPath).Equals(Path.GetFullPath(currentPath), StringComparison.OrdinalIgnoreCase))
+            if (!normalizedRegistryPath.Equals(normalizedCurrentPath, StringComparison.OrdinalIgnoreCase))
             {
                 // Registry entry exists but points to wrong path (old version/moved app)
                 // Clean it up by removing the invalid entry
@@ -449,64 +460,208 @@ namespace LGSTrayUI
 
                 if (!File.Exists(updateExePath))
                 {
+                    LogUpdateError("Update package is invalid - DeviceBatteryTray.exe not found in extracted path", extractedPath);
                     UpdateStatusMessage = "Update package is invalid.";
                     return;
                 }
 
+                // Create log file for update process
+                var logFile = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
+                var logFileQuoted = $"\"{logFile}\"";
+
                 // Create update script that will replace files, unblock them, and restart the app
                 var updateScript = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.bat");
                 
-                // Escape paths properly for batch script
-                var extractedPathEscaped = extractedPath.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                var currentDirEscaped = currentDir.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                var currentExePathEscaped = currentExePath.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                var deviceExePathEscaped = Path.Combine(currentDir, "DeviceBatteryTray.exe").Replace("\\", "\\\\").Replace("\"", "\\\"");
-                var hidExePathEscaped = Path.Combine(currentDir, "LGSTrayHID.exe").Replace("\\", "\\\\").Replace("\"", "\\\"");
+                // Use quotes around paths in batch file to handle spaces
+                var extractedPathQuoted = $"\"{extractedPath}\"";
+                var currentDirQuoted = $"\"{currentDir}\"";
+                var currentExePathQuoted = $"\"{currentExePath}\"";
+                var deviceExePathQuoted = $"\"{Path.Combine(currentDir, "DeviceBatteryTray.exe")}\"";
+                var hidExePathQuoted = $"\"{Path.Combine(currentDir, "LGSTrayHID.exe")}\"";
                 
                 var scriptContent = $@"@echo off
-setlocal
+setlocal enabledelayedexpansion
+set LOGFILE={logFileQuoted}
+
+echo [%date% %time%] Starting DeviceBatteryTray update process >> %LOGFILE%
+echo [%date% %time%] Source: {extractedPathQuoted} >> %LOGFILE%
+echo [%date% %time%] Destination: {currentDirQuoted} >> %LOGFILE%
+echo [%date% %time%] Current EXE: {currentExePathQuoted} >> %LOGFILE%
+echo.
 echo Updating DeviceBatteryTray...
+echo See log file: %LOGFILE%
+
+REM Wait a moment for the current app to fully exit
+echo [%date% %time%] Waiting 3 seconds for app to exit... >> %LOGFILE%
+timeout /t 3 /nobreak >nul
+
+REM Kill running processes forcefully and wait for them to actually exit
+echo [%date% %time%] Starting process termination loop... >> %LOGFILE%
+set KILL_COUNT=0
+
+:kill_loop
+set /a KILL_COUNT+=1
+echo [%date% %time%] Kill attempt !KILL_COUNT! >> %LOGFILE%
+taskkill /F /IM DeviceBatteryTray.exe >> %LOGFILE% 2>&1
+taskkill /F /IM LGSTrayHID.exe >> %LOGFILE% 2>&1
+
+REM Check if processes are still running
+tasklist /FI ""IMAGENAME eq DeviceBatteryTray.exe"" 2>nul | find /I /N ""DeviceBatteryTray.exe"">nul
+if ""!errorlevel!""==""0"" (
+    echo [%date% %time%] DeviceBatteryTray.exe still running, waiting... >> %LOGFILE%
+    goto :wait_more
+)
+tasklist /FI ""IMAGENAME eq LGSTrayHID.exe"" 2>nul | find /I /N ""LGSTrayHID.exe"">nul
+if ""!errorlevel!""==""0"" (
+    echo [%date% %time%] LGSTrayHID.exe still running, waiting... >> %LOGFILE%
+    goto :wait_more
+)
+echo [%date% %time%] All processes terminated successfully >> %LOGFILE%
+goto :copy_files
+
+:wait_more
+if !KILL_COUNT! GEQ 10 (
+    echo [%date% %time%] ERROR: Could not terminate processes after 10 attempts! >> %LOGFILE%
+    echo ERROR: Could not terminate processes. See log: %LOGFILE%
+    pause
+    exit /b 1
+)
+timeout /t 1 /nobreak >nul
+goto :kill_loop
+
+:copy_files
+REM Ensure processes are really gone
+echo [%date% %time%] Waiting additional 2 seconds before copying... >> %LOGFILE%
 timeout /t 2 /nobreak >nul
 
-REM Kill running processes
-taskkill /F /IM DeviceBatteryTray.exe >nul 2>&1
-taskkill /F /IM LGSTrayHID.exe >nul 2>&1
-timeout /t 1 /nobreak >nul
+REM Copy all files from extracted update (robocopy returns 0-7 for success)
+echo [%date% %time%] Starting file copy with robocopy... >> %LOGFILE%
+robocopy {extractedPathQuoted} {currentDirQuoted} /E /IS /IT /R:5 /W:2 /NP /NDL /NFL /NJH /NJS /LOG+:%LOGFILE%
+set COPY_EXIT=%errorlevel%
+echo [%date% %time%] Robocopy exit code: %COPY_EXIT% >> %LOGFILE%
 
-REM Copy all files from extracted update
-robocopy ""{extractedPathEscaped}"" ""{currentDirEscaped}"" /E /NFL /NDL /NJH /NJS /R:3 /W:1 >nul 2>&1
+REM Robocopy returns 0-7 for success, 8+ for errors
+if %COPY_EXIT% GEQ 8 (
+    echo [%date% %time%] ERROR: Failed to copy files. Error code: %COPY_EXIT% >> %LOGFILE%
+    echo ERROR: Failed to copy files. Error code: %COPY_EXIT%
+    echo See log file: %LOGFILE%
+    pause
+    exit /b 1
+)
+echo [%date% %time%] File copy completed successfully >> %LOGFILE%
 
 REM Unblock executables
-powershell -NoProfile -ExecutionPolicy Bypass -Command ""Unblock-File -Path '{deviceExePathEscaped}' -ErrorAction SilentlyContinue""
-powershell -NoProfile -ExecutionPolicy Bypass -Command ""Unblock-File -Path '{hidExePathEscaped}' -ErrorAction SilentlyContinue""
+echo [%date% %time%] Unblocking executables... >> %LOGFILE%
+powershell -NoProfile -ExecutionPolicy Bypass -Command ""Unblock-File -Path {deviceExePathQuoted} -ErrorAction SilentlyContinue"" >> %LOGFILE% 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command ""Unblock-File -Path {hidExePathQuoted} -ErrorAction SilentlyContinue"" >> %LOGFILE% 2>&1
+echo [%date% %time%] Executables unblocked >> %LOGFILE%
 
 REM Start the updated application
-start """" ""{currentExePathEscaped}""
+echo [%date% %time%] Starting updated application: {currentExePathQuoted} >> %LOGFILE%
+start """" {currentExePathQuoted}
+if errorlevel 1 (
+    echo [%date% %time%] ERROR: Failed to start application! >> %LOGFILE%
+    echo ERROR: Failed to start application. See log: %LOGFILE%
+    pause
+    exit /b 1
+)
+echo [%date% %time%] Application started successfully >> %LOGFILE%
 
-REM Cleanup after a short delay
-timeout /t 2 /nobreak >nul
-rmdir /S /Q ""{extractedPathEscaped}"" >nul 2>&1
+REM Cleanup after a delay
+echo [%date% %time%] Waiting 3 seconds before cleanup... >> %LOGFILE%
+timeout /t 3 /nobreak >nul
+
+echo [%date% %time%] Cleaning up extracted files... >> %LOGFILE%
+rmdir /S /Q {extractedPathQuoted} >> %LOGFILE% 2>&1
+echo [%date% %time%] Update process completed successfully >> %LOGFILE%
 del ""%~f0""
 ";
 
-                File.WriteAllText(updateScript, scriptContent);
+                File.WriteAllText(updateScript, scriptContent, Encoding.UTF8);
 
-                // Start the update script
-                var processStartInfo = new ProcessStartInfo
+                // Log update initiation
+                LogUpdateInfo("Starting update installation", $"Current: {currentExePath}", $"Update from: {extractedPath}", $"Log: {logFile}");
+
+                // Shutdown the application gracefully first
+                Application.Current.Dispatcher.Invoke(() =>
                 {
-                    FileName = updateScript,
-                    CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    UseShellExecute = true,
-                    Verb = "runas" // Run as admin if needed
-                };
+                    Application.Current.Shutdown();
+                });
 
-                Process.Start(processStartInfo);
-                Environment.Exit(0);
+                // Give the app a moment to start shutting down, then start the update script
+                Task.Run(async () =>
+                {
+                    await Task.Delay(1000); // Wait 1 second for app to start shutting down
+                    
+                    // Start the update script (no admin needed - we're in user directory)
+                    var processStartInfo = new ProcessStartInfo
+                    {
+                        FileName = updateScript,
+                        CreateNoWindow = false, // Show window so user can see progress
+                        WindowStyle = ProcessWindowStyle.Normal,
+                        UseShellExecute = true
+                    };
+
+                    try
+                    {
+                        Process.Start(processStartInfo);
+                    }
+                    catch
+                    {
+                        // Script will still run even if process start fails
+                    }
+                });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                UpdateStatusMessage = "Failed to install update. Please update manually.";
+                LogUpdateError($"Failed to install update: {ex.Message}", ex.ToString());
+                ShowBalloonTip("Update Error", $"Failed to install update: {ex.Message}\n\nCheck log file: {Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log")}", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+            }
+        }
+
+        private void LogUpdateInfo(string message, params string[] details)
+        {
+            try
+            {
+                var logFile = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
+                var logLines = new List<string>
+                {
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}"
+                };
+                
+                foreach (var detail in details)
+                {
+                    logLines.Add($"  -> {detail}");
+                }
+                
+                File.AppendAllLines(logFile, logLines);
+            }
+            catch
+            {
+                // Ignore logging errors
+            }
+        }
+
+        private void LogUpdateError(string message, string details = "")
+        {
+            try
+            {
+                var logFile = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
+                var logLines = new List<string>
+                {
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR: {message}"
+                };
+                
+                if (!string.IsNullOrEmpty(details))
+                {
+                    logLines.Add($"  Details: {details}");
+                }
+                
+                File.AppendAllLines(logFile, logLines);
+            }
+            catch
+            {
+                // Ignore logging errors
             }
         }
 

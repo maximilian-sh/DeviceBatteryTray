@@ -276,7 +276,9 @@ Write-Host "Would you like DeviceBatteryTray to start automatically with Windows
 $autoStartResponse = Read-Host
 if ($autoStartResponse -eq "Y" -or $autoStartResponse -eq "y") {
     $regPath = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-    Set-ItemProperty -Path $regPath -Name "DeviceBatteryTray" -Value "`"$exePath`"" -Type String
+    # Set registry value without quotes - Windows will handle quoting if needed
+    # Using the exePath directly ensures it matches what the app expects
+    Set-ItemProperty -Path $regPath -Name "DeviceBatteryTray" -Value $exePath -Type String
     Write-Host "Auto-start enabled" -ForegroundColor Green
 }
 
