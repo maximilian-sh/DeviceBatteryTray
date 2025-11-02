@@ -8,14 +8,10 @@ Minimal Windows tray app that shows battery for supported USB HID devices using 
 
 1) Download the latest `DeviceBatteryTray-vX.Y.Z-win-x64.zip` from Releases.
 
-2) Extract the ZIP and run `install.ps1`:
-   - **For current user install:** Right-click `install.ps1` → Run with PowerShell
+2) Extract the ZIP and double-click `install.bat`:
+   - **For current user install:** Just double-click `install.bat` (no admin needed)
      - Installs to `%LOCALAPPDATA%\DeviceBatteryTray\`
-   - **For system-wide install:** Right-click PowerShell → Run as Administrator, then:
-     ```powershell
-     cd "C:\path\to\extracted\folder"
-     .\install.ps1 -ProgramFiles
-     ```
+   - **For system-wide install:** Right-click `install.bat` → Run as Administrator
      - Installs to `C:\Program Files\DeviceBatteryTray\`
 
 The installer will:

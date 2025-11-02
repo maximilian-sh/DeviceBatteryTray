@@ -1,5 +1,8 @@
 # DeviceBatteryTray Installer Script
-# Usage: Right-click install.ps1 -> Run with PowerShell (as Administrator for Program Files install)
+# Usage: 
+#   - Double-click install.bat (recommended - no execution policy issues)
+#   - Or run: powershell -ExecutionPolicy Bypass -File install.ps1
+#   - For Program Files: Run install.bat as Administrator
 
 param(
     [switch]$ProgramFiles,

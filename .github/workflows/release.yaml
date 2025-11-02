@@ -78,7 +78,7 @@ jobs:
             Write-Host "  $($_.Name) - $size KB"
           }
           # Verify critical files exist
-          $requiredFiles = @("DeviceBatteryTray.exe", "LGSTrayHID.exe", "hidapi.dll", "appsettings.toml", "install.ps1", "uninstall.ps1", "INSTALL.txt")
+          $requiredFiles = @("DeviceBatteryTray.exe", "LGSTrayHID.exe", "hidapi.dll", "appsettings.toml", "install.bat", "install.ps1", "uninstall.bat", "uninstall.ps1", "INSTALL.txt")
           foreach ($file in $requiredFiles) {
             $path = Join-Path $outDir $file
             if (-not (Test-Path $path)) {

@@ -10,13 +10,11 @@ Option 1: Automated Installer (Recommended)
 
 1. Extract this ZIP file to any temporary location (e.g., your Downloads folder)
 
-2. Right-click on "install.ps1" and select "Run with PowerShell"
-
-3. Choose installation location:
-   - Default: Installs to %LOCALAPPDATA%\DeviceBatteryTray (no admin needed)
-   - For system-wide: Right-click PowerShell → Run as Administrator, then:
-     cd "C:\path\to\extracted\folder"
-     .\install.ps1 -ProgramFiles
+2. Double-click "install.bat" to run the installer:
+   - **For current user install:** Just double-click `install.bat` (no admin needed)
+     - Installs to: %LOCALAPPDATA%\DeviceBatteryTray
+   - **For system-wide install:** Right-click `install.bat` → Run as Administrator
+     - Installs to: C:\Program Files\DeviceBatteryTray
 
 4. The installer will:
    ✓ Extract files to the proper location
@@ -55,7 +53,7 @@ Option 1: Using the Uninstaller
    - %LOCALAPPDATA%\DeviceBatteryTray, or
    - C:\Program Files\DeviceBatteryTray\
 
-2. Right-click "uninstall.ps1" → Run with PowerShell
+2. Double-click "uninstall.bat" (or right-click → Run as Administrator if needed)
 
 3. The uninstaller will:
    ✓ Stop running processes

@@ -34,7 +34,9 @@
     <!-- Ensure appsettings.toml is in publish directory -->
     <Copy SourceFiles="appsettings.toml" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('appsettings.toml')" />
     <!-- Copy installer/uninstaller scripts and documentation to publish directory -->
+    <Copy SourceFiles="..\scripts\install.bat" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('..\scripts\install.bat')" />
     <Copy SourceFiles="..\scripts\install.ps1" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('..\scripts\install.ps1')" />
+    <Copy SourceFiles="..\scripts\uninstall.bat" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('..\scripts\uninstall.bat')" />
     <Copy SourceFiles="..\scripts\uninstall.ps1" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('..\scripts\uninstall.ps1')" />
     <Copy SourceFiles="..\INSTALL.txt" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('..\INSTALL.txt')" />
   </Target>
