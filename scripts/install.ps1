@@ -191,8 +191,37 @@ if ($autoStartResponse -eq "Y" -or $autoStartResponse -eq "y") {
     Write-Host "Auto-start enabled" -ForegroundColor Green
 }
 
-# Ask if user wants to start the app now
+# Run both executables briefly to trigger SmartScreen acceptance prompts
 Write-Host ""
+Write-Host "Triggering Windows SmartScreen prompts (this is normal and safe)..." -ForegroundColor Cyan
+Write-Host "You may see security prompts - please click 'Run' or 'More info' → 'Run anyway' for both executables." -ForegroundColor Yellow
+Write-Host ""
+
+# Start LGSTrayHID first, then main app (both need to be accepted)
+$hidExePath = Join-Path $installDir "LGSTrayHID.exe"
+if (Test-Path $hidExePath) {
+    Write-Host "Starting LGSTrayHID.exe to trigger SmartScreen..." -ForegroundColor Cyan
+    $hidProcess = Start-Process -FilePath $hidExePath -WorkingDirectory $installDir -PassThru -WindowStyle Minimized
+    Start-Sleep -Seconds 2
+    if (-not $hidProcess.HasExited) {
+        Stop-Process -Id $hidProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Start main app briefly
+Write-Host "Starting DeviceBatteryTray.exe to trigger SmartScreen..." -ForegroundColor Cyan
+$mainProcess = Start-Process -FilePath $exePath -WorkingDirectory $installDir -PassThru -WindowStyle Minimized
+Start-Sleep -Seconds 3
+if (-not $mainProcess.HasExited) {
+    Stop-Process -Id $mainProcess.Id -Force -ErrorAction SilentlyContinue
+    Write-Host "DeviceBatteryTray accepted by Windows. It will start properly on next launch." -ForegroundColor Green
+}
+
+Write-Host ""
+Write-Host "SmartScreen setup complete!" -ForegroundColor Green
+Write-Host ""
+
+# Ask if user wants to start the app now
 Write-Host "Would you like to start DeviceBatteryTray now? (Y/N)" -ForegroundColor Cyan
 $startNowResponse = Read-Host
 if ($startNowResponse -eq "Y" -or $startNowResponse -eq "y") {

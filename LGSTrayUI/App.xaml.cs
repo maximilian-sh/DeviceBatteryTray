@@ -57,6 +57,21 @@ public partial class App : Application
 
     static async Task LoadAppSettings(Microsoft.Extensions.Configuration.ConfigurationManager config)
     {
+        var settingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.toml");
+        
+        // If appsettings.toml doesn't exist, create it from default automatically
+        if (!File.Exists(settingsPath))
+        {
+            try
+            {
+                await File.WriteAllBytesAsync(settingsPath, LGSTrayUI.Properties.Resources.defaultAppsettings);
+            }
+            catch
+            {
+                // If we can't write, try to continue - will show error later
+            }
+        }
+
         try
         {
             config.AddTomlFile("appsettings.toml");
@@ -65,21 +80,44 @@ public partial class App : Application
         {
             if (ex is FileNotFoundException || ex is InvalidDataException)
             {
-                var msgBoxRet = MessageBox.Show(
-                    "Failed to read settings, do you want reset to default?", 
-                    "LGSTray - Settings Load Error", 
-                    MessageBoxButton.YesNo, MessageBoxImage.Error, MessageBoxResult.No
-                );
-
-                if (msgBoxRet == MessageBoxResult.Yes)
+                // Auto-reset to default on first error (better UX - don't prompt immediately)
+                try
                 {
-                    await File.WriteAllBytesAsync(
-                        Path.Combine(AppContext.BaseDirectory, "appsettings.toml"),
-                        LGSTrayUI.Properties.Resources.defaultAppsettings
-                    );
+                    await File.WriteAllBytesAsync(settingsPath, LGSTrayUI.Properties.Resources.defaultAppsettings);
+                    config.AddTomlFile("appsettings.toml");
+                    // Successfully reset, continue silently
                 }
+                catch
+                {
+                    // If we still can't fix it, ask user
+                    var msgBoxRet = MessageBox.Show(
+                        "Failed to read settings file. The file may be corrupted or inaccessible.\n\nClick Yes to reset to defaults, or No to exit.", 
+                        "LGSTray - Settings Load Error", 
+                        MessageBoxButton.YesNo, MessageBoxImage.Error, MessageBoxResult.Yes
+                    );
 
-                config.AddTomlFile("appsettings.toml");
+                    if (msgBoxRet == MessageBoxResult.Yes)
+                    {
+                        try
+                        {
+                            await File.WriteAllBytesAsync(settingsPath, LGSTrayUI.Properties.Resources.defaultAppsettings);
+                            config.AddTomlFile("appsettings.toml");
+                        }
+                        catch (Exception writeEx)
+                        {
+                            MessageBox.Show(
+                                $"Failed to write settings file: {writeEx.Message}\n\nPlease check file permissions.", 
+                                "LGSTray - Error", 
+                                MessageBoxButton.OK, MessageBoxImage.Error
+                            );
+                            throw;
+                        }
+                    }
+                    else
+                    {
+                        Environment.Exit(1);
+                    }
+                }
             }
             else
             {
