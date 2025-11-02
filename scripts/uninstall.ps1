@@ -5,7 +5,16 @@ param(
     [switch]$Help
 )
 
+# Keep window open on errors
 $ErrorActionPreference = "Stop"
+trap {
+    Write-Host ""
+    Write-Host "Error: $_" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Press any key to exit..."
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    exit 1
+}
 
 if ($Help) {
     Write-Host "DeviceBatteryTray Uninstaller"
@@ -111,11 +120,18 @@ if (Test-Path $desktopShortcut) {
     Write-Host "  Removed desktop shortcut" -ForegroundColor Green
 }
 
-# Remove Start Menu shortcut
+# Remove Start Menu shortcuts
 $startMenu = [Environment]::GetFolderPath("Programs")
 $startMenuDir = Join-Path $startMenu "DeviceBatteryTray"
 if (Test-Path $startMenuDir) {
     Remove-Item -Path $startMenuDir -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "  Removed Start Menu folder" -ForegroundColor Green
+}
+
+# Remove direct shortcut in Programs folder
+$directShortcut = Join-Path $startMenu "DeviceBatteryTray.lnk"
+if (Test-Path $directShortcut) {
+    Remove-Item -Path $directShortcut -Force -ErrorAction SilentlyContinue
     Write-Host "  Removed Start Menu shortcut" -ForegroundColor Green
 }
 
@@ -135,3 +151,6 @@ if (Test-Path $installDir) {
 Write-Host ""
 Write-Host "DeviceBatteryTray has been successfully uninstalled." -ForegroundColor Green
 Write-Host "Installation directory removed: $installDir" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Press any key to exit..."
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
