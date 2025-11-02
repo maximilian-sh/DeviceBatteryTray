@@ -14,21 +14,31 @@ namespace LGSTrayUI
         {
             if (DataContext is UpdateProgressViewModel vm)
             {
-                vm.Progress = percent;
-                if (!string.IsNullOrEmpty(status))
+                Dispatcher.Invoke(() =>
                 {
-                    vm.StatusText = status;
-                }
+                    vm.Progress = percent;
+                    if (!string.IsNullOrEmpty(status))
+                    {
+                        vm.StatusText = status;
+                    }
+                    // Force UI update
+                    InvalidateVisual();
+                }, System.Windows.Threading.DispatcherPriority.Normal);
             }
         }
-
+        
         public void SetStatus(string status)
         {
             if (DataContext is UpdateProgressViewModel vm)
             {
-                vm.StatusText = status;
+                Dispatcher.Invoke(() =>
+                {
+                    vm.StatusText = status;
+                    InvalidateVisual();
+                }, System.Windows.Threading.DispatcherPriority.Normal);
             }
         }
+
     }
 
     public class UpdateProgressViewModel : System.ComponentModel.INotifyPropertyChanged

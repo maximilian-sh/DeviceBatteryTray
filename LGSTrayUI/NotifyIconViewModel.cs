@@ -360,7 +360,12 @@ namespace LGSTrayUI
                 {
                     Application.Current.Dispatcher.Invoke(() =>
                     {
-                        progressWindow?.UpdateProgress(percent, "Downloading update...");
+                        if (progressWindow != null)
+                        {
+                            progressWindow.UpdateProgress(percent, "Downloading update...");
+                            // Force the window to process messages and update
+                            Application.Current.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+                        }
                     });
                 });
 
@@ -450,20 +455,37 @@ namespace LGSTrayUI
 
                 // Create update script that will replace files, unblock them, and restart the app
                 var updateScript = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.bat");
-                var deviceExePath = Path.Combine(currentDir, "DeviceBatteryTray.exe").Replace("\\", "\\\\");
-                var hidExePath = Path.Combine(currentDir, "LGSTrayHID.exe").Replace("\\", "\\\\");
+                
+                // Escape paths properly for batch script
+                var extractedPathEscaped = extractedPath.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var currentDirEscaped = currentDir.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var currentExePathEscaped = currentExePath.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var deviceExePathEscaped = Path.Combine(currentDir, "DeviceBatteryTray.exe").Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var hidExePathEscaped = Path.Combine(currentDir, "LGSTrayHID.exe").Replace("\\", "\\\\").Replace("\"", "\\\"");
                 
                 var scriptContent = $@"@echo off
+setlocal
+echo Updating DeviceBatteryTray...
 timeout /t 2 /nobreak >nul
+
+REM Kill running processes
 taskkill /F /IM DeviceBatteryTray.exe >nul 2>&1
 taskkill /F /IM LGSTrayHID.exe >nul 2>&1
 timeout /t 1 /nobreak >nul
-xcopy /Y /E /I ""{extractedPath}\*"" ""{currentDir}\""
-powershell -NoProfile -ExecutionPolicy Bypass -Command ""Unblock-File -Path '{deviceExePath}' -ErrorAction SilentlyContinue""
-powershell -NoProfile -ExecutionPolicy Bypass -Command ""Unblock-File -Path '{hidExePath}' -ErrorAction SilentlyContinue""
-start """" ""{currentExePath}""
+
+REM Copy all files from extracted update
+robocopy ""{extractedPathEscaped}"" ""{currentDirEscaped}"" /E /NFL /NDL /NJH /NJS /R:3 /W:1 >nul 2>&1
+
+REM Unblock executables
+powershell -NoProfile -ExecutionPolicy Bypass -Command ""Unblock-File -Path '{deviceExePathEscaped}' -ErrorAction SilentlyContinue""
+powershell -NoProfile -ExecutionPolicy Bypass -Command ""Unblock-File -Path '{hidExePathEscaped}' -ErrorAction SilentlyContinue""
+
+REM Start the updated application
+start """" ""{currentExePathEscaped}""
+
+REM Cleanup after a short delay
 timeout /t 2 /nobreak >nul
-rmdir /S /Q ""{extractedPath}"" >nul 2>&1
+rmdir /S /Q ""{extractedPathEscaped}"" >nul 2>&1
 del ""%~f0""
 ";
 

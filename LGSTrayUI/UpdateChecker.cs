@@ -129,16 +129,42 @@ namespace LGSTrayUI
 
                 var buffer = new byte[8192];
                 int bytesRead;
+                var lastReportedPercent = -1;
+                
                 while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
                 {
                     await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
                     bytesDownloaded += bytesRead;
 
-                    if (totalBytes > 0 && progress != null)
+                    if (progress != null)
                     {
-                        var percentComplete = (int)(bytesDownloaded * 100 / totalBytes);
-                        progress.Report(percentComplete);
+                        if (totalBytes > 0)
+                        {
+                            var percentComplete = (int)(bytesDownloaded * 100 / totalBytes);
+                            // Only report if percentage changed to avoid spamming
+                            if (percentComplete != lastReportedPercent)
+                            {
+                                progress.Report(percentComplete);
+                                lastReportedPercent = percentComplete;
+                            }
+                        }
+                        else
+                        {
+                            // If total size is unknown, report based on chunks downloaded (rough estimate)
+                            var estimatedPercent = (int)Math.Min(99, bytesDownloaded / 10000); // Rough estimate
+                            if (estimatedPercent != lastReportedPercent && estimatedPercent % 5 == 0)
+                            {
+                                progress.Report(estimatedPercent);
+                                lastReportedPercent = estimatedPercent;
+                            }
+                        }
                     }
+                }
+                
+                // Report 100% when done
+                if (progress != null)
+                {
+                    progress.Report(100);
                 }
 
                 // Extract zip
