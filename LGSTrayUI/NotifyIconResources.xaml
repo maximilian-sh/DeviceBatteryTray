@@ -30,7 +30,7 @@
         <MenuItem Header="Autostart with Windows" IsCheckable="True" IsChecked="{Binding AutoStart}" StaysOpenOnClick="True" />
         <Separator />
         <MenuItem Header="Check for Updates" Command="{Binding CheckForUpdatesCommand}" IsEnabled="{Binding CheckingForUpdates, Converter={x:Static local:BoolToInverseBoolConverter.Instance}}" StaysOpenOnClick="True" />
-        <MenuItem Header="{Binding AvailableUpdateVersion}" Command="{Binding DownloadAndInstallUpdateCommand}" IsEnabled="{Binding UpdateAvailable}" Visibility="{Binding UpdateAvailable, Converter={x:Static local:BoolToVisibilityConverter.Instance}}" StaysOpenOnClick="True" />
+        <MenuItem Header="{Binding AvailableUpdateVersion}" Command="{Binding DownloadAndInstallUpdateCommand}" IsEnabled="{Binding UpdateAvailable}" Visibility="{Binding UpdateAvailable, Converter={x:Static local:BoolToVisibilityConverter.Instance}}" />
         <MenuItem Header="Auto-check for Updates" IsCheckable="True" IsChecked="{Binding AutoUpdateEnabled}" StaysOpenOnClick="True" />
         <Separator />
         <MenuItem Header="{Binding AssemblyVersion}" IsEnabled="False" />

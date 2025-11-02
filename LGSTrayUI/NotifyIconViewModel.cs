@@ -149,7 +149,7 @@ namespace LGSTrayUI
         private UpdateInfo? _availableUpdate;
         
         public bool UpdateAvailable => _availableUpdate != null && _availableUpdate.IsNewer;
-        public string AvailableUpdateVersion => _availableUpdate != null ? $"Download v{_availableUpdate.Version}" : "Download Update";
+        public string AvailableUpdateVersion => _availableUpdate != null ? $"Update to v{_availableUpdate.Version}" : "Update";
         private CancellationTokenSource? _updateCheckCts;
         private Timer? _updateCheckTimer;
 
@@ -285,10 +285,12 @@ namespace LGSTrayUI
         {
             if (CheckingForUpdates)
             {
+                LogUpdateInfo("CheckForUpdates called but already checking - ignoring");
                 return;
             }
 
             CheckingForUpdates = true;
+            LogUpdateInfo("Starting update check", $"Current version: {AssemblyVersion}");
             ShowBalloonTip("Checking for updates...", "Please wait while we check for the latest version.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
 
             try
@@ -296,9 +298,12 @@ namespace LGSTrayUI
                 _updateCheckCts?.Cancel();
                 _updateCheckCts?.Dispose();
                 _updateCheckCts = new CancellationTokenSource();
+                LogUpdateInfo("Created cancellation token source for update check");
 
+                LogUpdateInfo("Calling UpdateChecker.CheckForUpdatesAsync");
                 var updateInfo = await UpdateChecker.CheckForUpdatesAsync(_updateCheckCts.Token);
                 _userSettings.LastUpdateCheck = DateTime.Now;
+                LogUpdateInfo("Update check completed", $"Result: {(updateInfo == null ? "null" : $"Version {updateInfo.Version}, IsNewer: {updateInfo.IsNewer}")}");
                 
                 // Ensure UI updates are on the UI thread
                 Application.Current.Dispatcher.Invoke(() =>
@@ -347,28 +352,55 @@ namespace LGSTrayUI
         [RelayCommand]
         private async Task DownloadAndInstallUpdate()
         {
-            if (_availableUpdate == null || CheckingForUpdates)
+            var logFile = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
+            
+            // Initialize log file at the very start
+            try
             {
+                File.WriteAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ========================================\n");
+                File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] UPDATE PROCESS STARTED\n");
+                File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Current version: {AssemblyVersion}\n");
+                File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ========================================\n\n");
+            }
+            catch { }
+            
+            if (_availableUpdate == null)
+            {
+                LogUpdateError("DownloadAndInstallUpdate called but _availableUpdate is null");
+                return;
+            }
+            
+            if (CheckingForUpdates)
+            {
+                LogUpdateInfo("DownloadAndInstallUpdate called but already in progress - ignoring");
                 return;
             }
 
             CheckingForUpdates = true;
+            LogUpdateInfo("Starting download and install", $"Target version: {_availableUpdate.Version}", $"Download URL: {_availableUpdate.DownloadUrl}");
 
             // Create and show progress window
             UpdateProgressWindow? progressWindow = null;
             Application.Current.Dispatcher.Invoke(() =>
             {
+                LogUpdateInfo("Creating progress window");
                 progressWindow = new UpdateProgressWindow(_availableUpdate.Version)
                 {
                     Owner = null // No owner to prevent closing issues
                 };
                 progressWindow.Show();
+                LogUpdateInfo("Progress window shown");
             });
 
             try
             {
+                LogUpdateInfo("Setting up progress callback");
                 var progress = new Progress<int>(percent =>
                 {
+                    if (percent % 10 == 0 || percent == 100)
+                    {
+                        LogUpdateInfo($"Download progress: {percent}%");
+                    }
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         if (progressWindow != null)
@@ -385,51 +417,77 @@ namespace LGSTrayUI
                     progressWindow?.SetStatus("Downloading update...");
                 });
 
-                var extractedPath = await UpdateChecker.DownloadUpdateAsync(
-                    _availableUpdate.DownloadUrl,
-                    progress,
-                    CancellationToken.None);
+                LogUpdateInfo("Starting download", $"URL: {_availableUpdate.DownloadUrl}");
+                string? extractedPath = null;
+                Exception? downloadException = null;
+                
+                try
+                {
+                    extractedPath = await UpdateChecker.DownloadUpdateAsync(
+                        _availableUpdate.DownloadUrl,
+                        progress,
+                        CancellationToken.None);
+                    LogUpdateInfo($"Download completed", $"Extracted path: {extractedPath ?? "null"}");
+                }
+                catch (Exception ex)
+                {
+                    downloadException = ex;
+                    LogUpdateError($"Download exception: {ex.GetType().Name}", ex.ToString());
+                }
 
                 if (string.IsNullOrEmpty(extractedPath))
                 {
+                    LogUpdateError("Download failed - extractedPath is null or empty", downloadException?.ToString() ?? "No exception details");
+                    var errorMsg = downloadException != null 
+                        ? $"Download failed: {downloadException.Message}\n\nCheck log: {logFile}"
+                        : "Download failed. Please check your internet connection and try again.\n\nCheck log: " + logFile;
+                    
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         progressWindow?.Close();
-                        ShowBalloonTip("Download Failed", "Failed to download update. Please try again later.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                        ShowBalloonTip("Download Failed", errorMsg, Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
                     });
                     CheckingForUpdates = false;
+                    LogUpdateInfo("Update process aborted due to download failure");
                     return;
                 }
 
+                LogUpdateInfo("Download successful, proceeding to installation", $"Extracted to: {extractedPath}");
+                
+                // Keep window open, show installation status
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    progressWindow?.UpdateProgress(100, "Installing update...");
-                    progressWindow?.SetStatus("Installing update. The application will restart shortly...");
+                    if (progressWindow != null)
+                    {
+                        progressWindow.UpdateProgress(100, "Installing update...");
+                        progressWindow.SetStatus($"Download complete!\n\nPreparing installation...\n\nLog: {logFile}");
+                    }
                 });
 
-                // Small delay to show 100% and installation message
-                await Task.Delay(500);
+                // Small delay to show completion
+                await Task.Delay(1000);
                 
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    progressWindow?.Close();
-                });
-                
+                LogUpdateInfo("Clearing update state and proceeding to installation");
                 // Clear the available update since we're installing it
                 _availableUpdate = null;
                 OnPropertyChanged(nameof(UpdateAvailable));
                 OnPropertyChanged(nameof(AvailableUpdateVersion));
                 
-                InstallUpdate(extractedPath);
+                // Install update - this will restart the app, so window will close naturally
+                LogUpdateInfo("Calling InstallUpdate");
+                await InstallUpdate(extractedPath, progressWindow);
             }
             catch (Exception ex)
             {
+                LogUpdateError($"Unexpected error in DownloadAndInstallUpdate: {ex.GetType().Name}", ex.ToString());
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     progressWindow?.Close();
-                    ShowBalloonTip("Download Error", $"Error downloading update: {ex.Message}", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                    var logFile = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
+                    ShowBalloonTip("Download Error", $"Error downloading update: {ex.Message}\n\nCheck log: {logFile}", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
                 });
                 CheckingForUpdates = false;
+                LogUpdateInfo("Update process ended due to exception");
             }
         }
 
@@ -450,13 +508,17 @@ namespace LGSTrayUI
             _mainTaskbarIconWrapper.TaskbarIcon.ShowBalloonTip(title, message, icon);
         }
 
-        private void InstallUpdate(string extractedPath)
+        private async Task InstallUpdate(string extractedPath, UpdateProgressWindow? progressWindow)
         {
+            LogUpdateInfo("InstallUpdate called", $"Extracted path: {extractedPath}");
+            
             try
             {
                 var currentExePath = Environment.ProcessPath!;
                 var currentDir = Path.GetDirectoryName(currentExePath)!;
                 var updateExePath = Path.Combine(extractedPath, "DeviceBatteryTray.exe");
+
+                LogUpdateInfo("Checking update package", $"Current EXE: {currentExePath}", $"Current dir: {currentDir}", $"Update EXE: {updateExePath}");
 
                 if (!File.Exists(updateExePath))
                 {
@@ -464,10 +526,23 @@ namespace LGSTrayUI
                     UpdateStatusMessage = "Update package is invalid.";
                     return;
                 }
+                
+                LogUpdateInfo("Update package validated successfully");
 
-                // Create log file for update process
+                // Create log file for update process - create it early to ensure it exists
                 var logFile = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.log");
                 var logFileQuoted = $"\"{logFile}\"";
+                
+                // Initialize log file
+                try
+                {
+                    File.WriteAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Update process initialized\n");
+                    File.AppendAllText(logFile, $"Log file location: {logFile}\n");
+                }
+                catch
+                {
+                    // If we can't create log, continue anyway
+                }
 
                 // Create update script that will replace files, unblock them, and restart the app
                 var updateScript = Path.Combine(Path.GetTempPath(), "DeviceBatteryTray_Update.bat");
@@ -580,37 +655,98 @@ del ""%~f0""
                 File.WriteAllText(updateScript, scriptContent, Encoding.UTF8);
 
                 // Log update initiation
-                LogUpdateInfo("Starting update installation", $"Current: {currentExePath}", $"Update from: {extractedPath}", $"Log: {logFile}");
+                LogUpdateInfo("Starting update installation", $"Current: {currentExePath}", $"Update from: {extractedPath}", $"Log: {logFile}", $"Script: {updateScript}");
 
-                // Shutdown the application gracefully first
+                // Update progress window
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    Application.Current.Shutdown();
+                    if (progressWindow != null)
+                    {
+                        progressWindow.SetStatus("Preparing update... Starting installation script...");
+                    }
                 });
 
-                // Give the app a moment to start shutting down, then start the update script
-                Task.Run(async () =>
+                // CRITICAL: Start the update script FIRST, before shutting down
+                // The script will wait for the app to exit, then do the update
+                var processStartInfo = new ProcessStartInfo
                 {
-                    await Task.Delay(1000); // Wait 1 second for app to start shutting down
-                    
-                    // Start the update script (no admin needed - we're in user directory)
-                    var processStartInfo = new ProcessStartInfo
-                    {
-                        FileName = updateScript,
-                        CreateNoWindow = false, // Show window so user can see progress
-                        WindowStyle = ProcessWindowStyle.Normal,
-                        UseShellExecute = true
-                    };
+                    FileName = updateScript,
+                    CreateNoWindow = false, // Show window so user can see progress
+                    WindowStyle = ProcessWindowStyle.Normal,
+                    UseShellExecute = true,
+                    WorkingDirectory = Path.GetTempPath()
+                };
 
-                    try
+                try
+                {
+                    LogUpdateInfo("Starting update script", $"Script: {updateScript}");
+                    
+                    Application.Current.Dispatcher.Invoke(() =>
                     {
-                        Process.Start(processStartInfo);
-                    }
-                    catch
+                        if (progressWindow != null)
+                        {
+                            progressWindow.SetStatus("Starting update script...");
+                        }
+                    });
+                    
+                    var updateProcess = Process.Start(processStartInfo);
+                    
+                    if (updateProcess == null)
                     {
-                        // Script will still run even if process start fails
+                        LogUpdateError("Failed to start update script - Process.Start returned null");
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            progressWindow?.Close();
+                            ShowBalloonTip("Update Error", $"Failed to start update script. Check log: {logFile}", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                        });
+                        CheckingForUpdates = false;
+                        return;
                     }
-                });
+                    
+                    LogUpdateInfo("Update script started successfully", $"Process ID: {updateProcess.Id}", $"Script path: {updateScript}");
+                    
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        if (progressWindow != null)
+                        {
+                            progressWindow.SetStatus($"Update script running (PID: {updateProcess.Id})\nThe app will restart in 2 seconds...\n\nSee log: {logFile}");
+                        }
+                    });
+                    
+                    // Give the script a moment to start and initialize, then shutdown the app
+                    // The script will wait for us to exit before proceeding
+                    LogUpdateInfo("Waiting 2 seconds for script to initialize");
+                    await Task.Delay(2000); // Give script time to initialize
+                    
+                    LogUpdateInfo("Shutting down application for update", "Calling Environment.Exit(0)");
+                    
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        if (progressWindow != null)
+                        {
+                            progressWindow.SetStatus("Restarting application...\n\nCheck the update script window for progress.");
+                        }
+                    });
+                    
+                    // Small delay to show the message
+                    await Task.Delay(500);
+                    
+                    LogUpdateInfo("=== APPLICATION EXITING FOR UPDATE ===", "The update script will continue the process");
+                    
+                    // Force exit immediately - don't wait for graceful shutdown
+                    // The script will handle the rest
+                    Environment.Exit(0);
+                }
+                catch (Exception ex)
+                {
+                    LogUpdateError($"Failed to start update script: {ex.Message}", ex.ToString());
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        progressWindow?.Close();
+                        ShowBalloonTip("Update Error", $"Failed to start update script: {ex.Message}\n\nCheck log: {logFile}", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+                    });
+                    CheckingForUpdates = false;
+                }
             }
             catch (Exception ex)
             {
