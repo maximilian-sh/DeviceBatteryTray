@@ -3,7 +3,9 @@
     "allow": [
       "Bash(dotnet build:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nBump version to 5.2.1 - Fix device detection regression\n\nFixed critical bug where devices were not being detected after v5.2.0:\n- The ''true ||'' was intentional to always reinitialize devices on arrival (reconnect scenario)\n- Changed to properly stop old polling before creating new device instance\n- Fixed type mismatch (byte vs ushort) for deviceIdx\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nBump version to 5.2.1 - Fix device detection regression\n\nFixed critical bug where devices were not being detected after v5.2.0:\n- The ''true ||'' was intentional to always reinitialize devices on arrival (reconnect scenario)\n- Changed to properly stop old polling before creating new device instance\n- Fixed type mismatch (byte vs ushort) for deviceIdx\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nBump version to 5.2.2 - Fix tooltip always on top\n\nFixed issue where the battery percentage tooltip popup would sometimes appear behind the taskbar:\n- Added TrayToolTipOpen event handler to set the popup window as topmost\n- Uses Win32 SetWindowPos API to ensure tooltip is always visible above taskbar\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")"
     ]
   }
 }

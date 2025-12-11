@@ -4,7 +4,10 @@ using LGSTrayPrimitives;
 using Microsoft.Extensions.Options;
 using System;
 using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 
 namespace LGSTrayUI
 {
@@ -130,6 +133,34 @@ namespace LGSTrayUI
         private void DrawBatteryIcon()
         {
             _ = Dispatcher.BeginInvoke(() => _drawBatteryIcon(taskbarIcon, (LogiDevice)DataContext));
+        }
+
+        // Win32 API for setting window to topmost
+        private const int HWND_TOPMOST = -1;
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOACTIVATE = 0x0010;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        private void TaskbarIcon_TrayToolTipOpen(object sender, RoutedEventArgs e)
+        {
+            // Find the popup window that hosts the tooltip and set it to topmost
+            if (taskbarIcon.TrayToolTipResolved != null)
+            {
+                var popup = taskbarIcon.TrayToolTipResolved.Parent;
+                if (popup is System.Windows.Controls.Primitives.Popup p && p.Child != null)
+                {
+                    // Get the HwndSource from the popup
+                    var hwndSource = PresentationSource.FromVisual(p.Child) as HwndSource;
+                    if (hwndSource != null)
+                    {
+                        SetWindowPos(hwndSource.Handle, new IntPtr(HWND_TOPMOST), 0, 0, 0, 0,
+                            SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+                    }
+                }
+            }
         }
     }
 }
