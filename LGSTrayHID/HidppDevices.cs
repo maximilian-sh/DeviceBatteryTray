@@ -128,40 +128,37 @@ namespace LGSTrayHID
         {
             if ((buffer[2] == 0x41) && ((buffer[4] & 0x40) == 0))
             {
-                // HID++ 1.0 device arrival message
-                byte deviceIdx = buffer[1];
-                HidppDevice? device = null;
-                bool shouldInit = false;
+                // HID++ 1.0 device arrival message - always (re)initialize on arrival
+                ushort deviceIdx = buffer[1];
+                HidppDevice device;
 
                 lock (_deviceCollectionLock)
                 {
-                    if (!_deviceCollection.ContainsKey(deviceIdx))
+                    // Always create/replace device on arrival - device may have reconnected
+                    if (_deviceCollection.TryGetValue(deviceIdx, out var existingDevice))
                     {
-                        device = new(this, deviceIdx);
-                        _deviceCollection[deviceIdx] = device;
-                        shouldInit = true;
+                        existingDevice.StopPolling();
                     }
+                    device = new(this, (byte)deviceIdx);
+                    _deviceCollection[deviceIdx] = device;
                 }
 
-                if (shouldInit && device != null)
+                // Run initialization on a background thread with proper async handling
+                _ = Task.Run(async () =>
                 {
-                    // Run initialization on a background thread with proper async handling
-                    _ = Task.Run(async () =>
+                    try
                     {
-                        try
-                        {
-                            // Wait for device to settle before initialization
-                            await Task.Delay(1000);
-                            await device.InitAsync();
-                        }
-                        catch (Exception ex)
-                        {
+                        // Wait for device to settle before initialization
+                        await Task.Delay(1000);
+                        await device.InitAsync();
+                    }
+                    catch (Exception ex)
+                    {
 #if DEBUG
-                            Console.WriteLine($"Device {deviceIdx} init failed: {ex.Message}");
+                        Console.WriteLine($"Device {deviceIdx} init failed: {ex.Message}");
 #endif
-                        }
-                    });
-                }
+                    }
+                });
             }
             else
             {
