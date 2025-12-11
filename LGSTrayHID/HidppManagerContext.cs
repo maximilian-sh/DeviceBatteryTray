@@ -3,6 +3,8 @@ using static LGSTrayHID.HidApi.HidApiWinApi;
 using static LGSTrayHID.HidApi.HidApiHotPlug;
 using LGSTrayHID.HidApi;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using LGSTrayPrimitives.MessageStructs;
 
 namespace LGSTrayHID
@@ -14,6 +16,7 @@ namespace LGSTrayHID
 
         private readonly Dictionary<string, Guid> _containerMap = [];
         private readonly Dictionary<Guid, HidppDevices> _deviceMap = [];
+        private readonly object _deviceMapLock = new();
         private readonly BlockingCollection<HidDeviceInfo> _deviceQueue = [];
 
         public delegate void HidppDeviceEventHandler(IPCMessageType messageType, IPCMessage message);
@@ -64,11 +67,15 @@ namespace LGSTrayHID
             var messageType = (deviceInfo).GetHidppMessageType();
             if (messageType is HidppMessageType.SHORT or HidppMessageType.LONG)
             {
-                if (!_deviceMap.TryGetValue(containerId, out HidppDevices? value))
+                HidppDevices? value;
+                lock (_deviceMapLock)
                 {
-                    value = new();
-                    _deviceMap[containerId] = value;
-                    _containerMap[devPath] = containerId;
+                    if (!_deviceMap.TryGetValue(containerId, out value))
+                    {
+                        value = new();
+                        _deviceMap[containerId] = value;
+                        _containerMap[devPath] = containerId;
+                    }
                 }
 
                 switch (messageType)
@@ -131,7 +138,10 @@ namespace LGSTrayHID
 
                 // Start polling in background (implementation inside HyperXDevice)
                 _ = HyperX.HyperXDevice.StartPollingAsync(dev, containerId, manufacturer, product, HidppDeviceEvent, CancellationToken.None);
-                _containerMap[devPath] = containerId;
+                lock (_deviceMapLock)
+                {
+                    _containerMap[devPath] = containerId;
+                }
                 return 0;
             }
 
@@ -142,23 +152,39 @@ namespace LGSTrayHID
         {
             string devPath = (*deviceInfo).GetPath();
 
-            if (_containerMap.TryGetValue(devPath, out var containerId))
+            HidppDevices? deviceToDispose = null;
+            Guid containerId;
+
+            lock (_deviceMapLock)
             {
-                // Notify UI that device is now off/not active
-                HidppDeviceEvent?.Invoke(
-                    LGSTrayPrimitives.MessageStructs.IPCMessageType.UPDATE,
-                    new LGSTrayPrimitives.MessageStructs.UpdateMessage(
-                        containerId.ToString(),
-                        -1,
-                        LGSTrayPrimitives.PowerSupplyStatus.POWER_SUPPLY_STATUS_UNKNOWN,
-                        0,
-                        DateTimeOffset.Now
-                    )
-                );
-                _deviceMap[containerId].Dispose();
-                _deviceMap.Remove(containerId);
-                _containerMap.Remove(devPath);
+                if (_containerMap.TryGetValue(devPath, out containerId))
+                {
+                    if (_deviceMap.TryGetValue(containerId, out deviceToDispose))
+                    {
+                        _deviceMap.Remove(containerId);
+                    }
+                    _containerMap.Remove(devPath);
+                }
+                else
+                {
+                    return 0;
+                }
             }
+
+            // Notify UI that device is now off/not active (outside of lock)
+            HidppDeviceEvent?.Invoke(
+                LGSTrayPrimitives.MessageStructs.IPCMessageType.UPDATE,
+                new LGSTrayPrimitives.MessageStructs.UpdateMessage(
+                    containerId.ToString(),
+                    -1,
+                    LGSTrayPrimitives.PowerSupplyStatus.POWER_SUPPLY_STATUS_UNKNOWN,
+                    0,
+                    DateTimeOffset.Now
+                )
+            );
+
+            // Dispose outside of lock to prevent deadlocks
+            deviceToDispose?.Dispose();
 
             return 0;
         }
@@ -195,8 +221,17 @@ namespace LGSTrayHID
     
         public async Task ForceBatteryUpdates()
         {
-            foreach (var (_, hidppDevice) in _deviceMap)
+            // Get a snapshot of devices under lock
+            List<HidppDevices> devices;
+            lock (_deviceMapLock)
             {
+                devices = _deviceMap.Values.ToList();
+            }
+
+            foreach (var hidppDevice in devices)
+            {
+                if (hidppDevice.Disposed) continue;
+
                 var tasks = hidppDevice.DeviceCollection
                     .Select(x => x.Value)
                     .Select(x => x.UpdateBattery(true));

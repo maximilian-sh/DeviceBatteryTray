@@ -17,6 +17,7 @@ namespace LGSTrayHID
     {
         private readonly SemaphoreSlim _initSemaphore = new(1, 1);
         private Func<HidppDevice, Task<BatteryUpdateReturn?>>? _getBatteryAsync;
+        private CancellationTokenSource? _pollingCts;
 
         public string DeviceName { get; private set; } = string.Empty;
         public int DeviceType { get; private set; } = 3;
@@ -38,6 +39,16 @@ namespace LGSTrayHID
         {
             _parent = parent;
             _deviceIdx = deviceIdx;
+        }
+
+        /// <summary>
+        /// Stops the battery polling loop if running.
+        /// </summary>
+        public void StopPolling()
+        {
+            _pollingCts?.Cancel();
+            _pollingCts?.Dispose();
+            _pollingCts = null;
         }
 
         public async Task InitAsync()
@@ -189,27 +200,54 @@ namespace LGSTrayHID
 
             await Task.Delay(1000);
 
-            _ = Task.Run(async () =>
+            // Start battery polling with cancellation support
+            if (_getBatteryAsync != null)
             {
-                if (_getBatteryAsync == null) { return; }
+                _pollingCts = new CancellationTokenSource();
+                var token = _pollingCts.Token;
 
-                while (true)
+                _ = Task.Run(async () =>
                 {
-                    var now = DateTimeOffset.Now;
-#if DEBUG
-                    var expectedUpdateTime = lastUpdate.AddSeconds(1);
-#else
-                    var expectedUpdateTime = lastUpdate.AddSeconds(GlobalSettings.settings.PollPeriod);
-#endif
-                    if (now < expectedUpdateTime)
+                    try
                     {
-                        await Task.Delay((int)(expectedUpdateTime - now).TotalMilliseconds);
-                    }
+                        while (!token.IsCancellationRequested && !Parent.Disposed)
+                        {
+                            var now = DateTimeOffset.Now;
+#if DEBUG
+                            var expectedUpdateTime = lastUpdate.AddSeconds(1);
+#else
+                            var expectedUpdateTime = lastUpdate.AddSeconds(GlobalSettings.settings.PollPeriod);
+#endif
+                            if (now < expectedUpdateTime)
+                            {
+                                var delayMs = (int)(expectedUpdateTime - now).TotalMilliseconds;
+                                if (delayMs > 0)
+                                {
+                                    await Task.Delay(delayMs, token);
+                                }
+                            }
 
-                    await UpdateBattery();
-                    await Task.Delay(GlobalSettings.settings.RetryTime * 1000);
-                }
-            });
+                            if (token.IsCancellationRequested || Parent.Disposed) break;
+
+                            await UpdateBattery();
+
+                            if (token.IsCancellationRequested || Parent.Disposed) break;
+
+                            await Task.Delay(GlobalSettings.settings.RetryTime * 1000, token);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected when cancellation is requested
+                    }
+                    catch (Exception ex)
+                    {
+#if DEBUG
+                        Log.WriteLine($"Battery polling error for {DeviceName}: {ex.Message}");
+#endif
+                    }
+                }, token);
+            }
         }
 
         public async Task UpdateBattery(bool forceIpcUpdate = false)
