@@ -17,7 +17,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <VersionPrefix>5.2.2</VersionPrefix>
+    <VersionPrefix>5.2.3</VersionPrefix>
     <AssemblyName>DeviceBatteryTray</AssemblyName>
     <ApplicationIcon>Resources\logo_black.ico</ApplicationIcon>
   </PropertyGroup>

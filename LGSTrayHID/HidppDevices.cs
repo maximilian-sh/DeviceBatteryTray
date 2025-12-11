@@ -22,7 +22,6 @@ namespace LGSTrayHID
         private const int READ_TIMEOUT = 100;
 
         private readonly Dictionary<ushort, HidppDevice> _deviceCollection = [];
-        private readonly object _deviceCollectionLock = new();
         public IReadOnlyDictionary<ushort, HidppDevice> DeviceCollection => _deviceCollection;
 
         private readonly SemaphoreSlim _semaphore = new(1, 1);
@@ -63,12 +62,9 @@ namespace LGSTrayHID
                 _isReading = false;
 
                 // Stop all device polling loops
-                lock (_deviceCollectionLock)
+                foreach (var device in _deviceCollection.Values)
                 {
-                    foreach (var device in _deviceCollection.Values)
-                    {
-                        device.StopPolling();
-                    }
+                    device.StopPolling();
                 }
 
                 _devShort = IntPtr.Zero;
@@ -129,36 +125,25 @@ namespace LGSTrayHID
             if ((buffer[2] == 0x41) && ((buffer[4] & 0x40) == 0))
             {
                 // HID++ 1.0 device arrival message - always (re)initialize on arrival
-                ushort deviceIdx = buffer[1];
-                HidppDevice device;
+                byte deviceIdx = buffer[1];
 
-                lock (_deviceCollectionLock)
+                // Stop existing device polling if present, then create new device
+                if (_deviceCollection.TryGetValue(deviceIdx, out var existingDevice))
                 {
-                    // Always create/replace device on arrival - device may have reconnected
-                    if (_deviceCollection.TryGetValue(deviceIdx, out var existingDevice))
-                    {
-                        existingDevice.StopPolling();
-                    }
-                    device = new(this, (byte)deviceIdx);
-                    _deviceCollection[deviceIdx] = device;
+                    existingDevice.StopPolling();
                 }
+                _deviceCollection[deviceIdx] = new(this, deviceIdx);
 
-                // Run initialization on a background thread with proper async handling
-                _ = Task.Run(async () =>
+                // Use Thread like original code - important for proper async context
+                new Thread(async () =>
                 {
                     try
                     {
-                        // Wait for device to settle before initialization
                         await Task.Delay(1000);
-                        await device.InitAsync();
+                        await _deviceCollection[deviceIdx].InitAsync();
                     }
-                    catch (Exception ex)
-                    {
-#if DEBUG
-                        Console.WriteLine($"Device {deviceIdx} init failed: {ex.Message}");
-#endif
-                    }
-                });
+                    catch (Exception) { }
+                }).Start();
             }
             else
             {
@@ -351,37 +336,20 @@ namespace LGSTrayHID
 
             await Task.Delay(500);
 
-            // Check if we need to manually discover devices (fallback)
-            bool needsManualDiscovery;
-            lock (_deviceCollectionLock)
-            {
-                needsManualDiscovery = _deviceCollection.Count == 0;
-            }
-
-            if (needsManualDiscovery)
+            if (_deviceCollection.Count == 0)
             {
                 // Fail to enumerate devices via arrival messages, try manual ping
-                var devicesToInit = new List<HidppDevice>();
-
                 for (byte i = 1; i <= 6; i++)
                 {
                     var ping = await Ping20(i, 100, false);
                     if (ping)
                     {
-                        lock (_deviceCollectionLock)
-                        {
-                            if (!_deviceCollection.ContainsKey(i))
-                            {
-                                var device = new HidppDevice(this, i);
-                                _deviceCollection[i] = device;
-                                devicesToInit.Add(device);
-                            }
-                        }
+                        var deviceIdx = i;
+                        _deviceCollection[deviceIdx] = new(this, deviceIdx);
                     }
                 }
 
-                // Initialize discovered devices sequentially
-                foreach (var device in devicesToInit)
+                foreach ((_, var device) in _deviceCollection)
                 {
                     await device.InitAsync();
                 }
