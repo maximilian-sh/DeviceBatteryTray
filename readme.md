@@ -1,5 +1,12 @@
 # DeviceBatteryTray
 
+> [!IMPORTANT]
+> **This project is no longer maintained and has been archived.**
+>
+> Use **[Wireless Battery](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor)** instead. It does everything this app did and much more: Logitech (HID++) and HyperX are covered more completely (including charging and connection state), plus 40+ other brands (Razer, SteelSeries, Corsair, Sony, ...), battery shown right on the taskbar, a tiny native app (~350 KB), and active maintenance.
+>
+> Download: [WirelessBattery-Setup from the latest release](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor/releases/latest)
+
 Minimal Windows tray app that shows battery for supported USB HID devices using native HID only. No Logitech G Hub or other vendor apps required.
 
 ## Install
